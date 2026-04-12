@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const Header = () => {
+    const location = useLocation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const isActive = (path) => location.pathname === path;
 
     return (
         <header className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-50">
@@ -23,36 +26,50 @@ const Header = () => {
 
                     {/* ==================== MENU DESKTOP ==================== */}
                     <nav className="hidden md:flex items-center gap-8 text-[15px] font-medium ml-12">
-                        <a
-                            href="#"
-                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200"
+                        <Link
+                            to="/movies"
+                            className={`relative inline-block h-6 uppercase pb-2 transition-colors duration-200 ${
+                                isActive('/movies')
+                                    ? 'text-red-500'
+                                    : 'text-zinc-300 hover:text-red-500'
+                            }`}
                         >
-                            Trang chủ
-                        </a>
-                        <a
-                            href="#"
-                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200"
+                            Phim
+                        
+                            {isActive('/movies') && (
+                                <span className="absolute left-0 bottom-[-4px] w-full h-[2px] bg-red-500"></span>
+                            )}
+                        </Link>
+                        <Link
+                            to="#"
+                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200 uppercase"
                         >
-                            Phim đang chiếu
-                        </a>
-                        <a
-                            href="#"
-                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200"
+                            Lịch chiếu theo rạp
+                        </Link>
+                        <div className="relative group">
+                            <div className="text-zinc-300 hover:text-red-500 transition-colors duration-200 cursor-pointer uppercase">
+                                Rạp
+                            </div>
+                            <div className="absolute top-full left-0 mt-4 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible translate-y-2 group-hover:translate-y-0 transition-all duration-300 z-50">
+                                <ul className="py-2 text-sm">
+                                    <li className="px-4 py-3 hover:bg-zinc-800 cursor-pointer text-zinc-300 hover:text-red-500">
+                                        CineTicket TP.HCM
+                                    </li>
+                                    <li className="px-4 py-3 hover:bg-zinc-800 cursor-pointer text-zinc-300 hover:text-red-500">
+                                        CineTicket Hà Nội
+                                    </li>
+                                    <li className="px-4 py-3 hover:bg-zinc-800 cursor-pointer text-zinc-300 hover:text-red-500">
+                                        CineTicket Đà Nẵng
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        <Link
+                            to="#"
+                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200 uppercase"
                         >
-                            Phim sắp chiếu
-                        </a>
-                        <a
-                            href="#"
-                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200"
-                        >
-                            Rạp
-                        </a>
-                        <a
-                            href="#"
-                            className="text-zinc-300 hover:text-red-500 transition-colors duration-200"
-                        >
-                            Khuyến mãi
-                        </a>
+                            Giá vé
+                        </Link>
                     </nav>
 
                     {/* ==================== SEARCH BAR ==================== */}
@@ -63,9 +80,7 @@ const Header = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Tìm phim, diễn viên, rạp..."
-                                className="w-full bg-zinc-900 border border-zinc-700 focus:border-red-600 
-                                           rounded-full py-3 pl-12 pr-5 text-sm text-white 
-                                           placeholder-zinc-400 focus:outline-none transition-all"
+                                className="w-full bg-zinc-900 border border-zinc-700 focus:border-red-600 rounded-full py-3 pl-12 pr-5 text-sm text-white placeholder-zinc-400 focus:outline-none transition-all"
                             />
                             <div className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500">
                                 <svg
@@ -88,7 +103,6 @@ const Header = () => {
 
                     {/* ==================== RIGHT SIDE ==================== */}
                     <div className="flex items-center gap-3 flex-shrink-0">
-                        {/* Vé của tôi */}
                         <button className="hidden sm:flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-zinc-300 hover:text-white border border-zinc-700 hover:border-zinc-600 rounded-full transition-all">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -107,7 +121,6 @@ const Header = () => {
                             Vé của tôi
                         </button>
 
-                        {/* Đăng nhập */}
                         <button className="flex items-center gap-2 px-6 py-2.5 bg-white text-black text-sm font-semibold rounded-full hover:bg-zinc-200 transition-all">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -126,7 +139,6 @@ const Header = () => {
                             Đăng nhập
                         </button>
 
-                        {/* Hamburger Menu */}
                         <button
                             onClick={() => setIsMenuOpen(!isMenuOpen)}
                             className="md:hidden p-2 text-white"
@@ -171,20 +183,17 @@ const Header = () => {
             {isMenuOpen && (
                 <div className="md:hidden bg-zinc-950 border-t border-zinc-800 px-6 py-6">
                     <div className="flex flex-col gap-5 text-base font-medium">
-                        <a href="#" className="text-white py-3">
-                            Trang chủ
-                        </a>
-                        <a href="#" className="text-white py-3">
-                            Phim đang chiếu
-                        </a>
-                        <a href="#" className="text-white py-3">
-                            Phim sắp chiếu
-                        </a>
+                        <Link to="/movies" className="text-white py-3">
+                            Phim
+                        </Link>
+                        <Link to="/schedule" className="text-white py-3">
+                            Lịch chiếu
+                        </Link>
                         <a href="#" className="text-red-500 py-3">
                             Rạp
                         </a>
                         <a href="#" className="text-white py-3">
-                            Khuyến mãi
+                            Giá vé
                         </a>
                     </div>
                 </div>

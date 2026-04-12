@@ -1,54 +1,93 @@
-import { Ticket, Clock, Calendar } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const MovieCard = ({ movie }) => {
+    const [openTrailer, setOpenTrailer] = useState(false);
+    const navigate = useNavigate();
+    // Hàm convert link youtube → embed
+    const getEmbedUrl = (url) => {
+        return url.replace('watch?v=', 'embed/');
+    };
+
     return (
-        <div className="group relative bg-zinc-900 rounded-2xl overflow-hidden hover:shadow-2xl transition-all duration-300 hover:-translate-y-2">
-            {/* Poster */}
-            <div className="relative">
-                <img 
-                    src={movie.poster_url} 
-                    alt={movie.title}
-                    className="w-full h-[380px] object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                
-                {/* Age Limit */}
-                <div className="absolute top-4 right-4 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-md">
-                    {movie.age_limit}
+        <>
+            <div className="group cursor-pointer"
+                onClick={() => navigate(`/movie/${movie.movie_id}`)}
+            >
+                {/* Poster */}
+                <div className="relative overflow-hidden rounded-2xl">
+                    <img
+                        src={movie.poster_url}
+                        alt={movie.title}
+                        className="w-full h-[360px] object-cover"
+                    />
+
+                    {/* Hover info */}
+                    <div
+                        className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black via-black/80 to-transparent 
+          p-4 translate-y-full group-hover:translate-y-0 transition duration-500"
+                    >
+                        <h3 className="text-white font-semibold text-lg mb-2">{movie.title}</h3>
+
+                        <div className="text-sm text-zinc-300 space-y-1">
+                            <p>⏱️ {movie.duration} phút</p>
+                            <p>🌍 Việt Nam</p>
+                        </div>
+                    </div>
+
+                    {/* Age */}
+                    <div className="absolute top-3 left-3 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                        {movie.age_limit}
+                    </div>
                 </div>
 
-                {/* Duration */}
-                <div className="absolute bottom-4 left-4 bg-black/70 text-white text-xs px-3 py-1 rounded flex items-center gap-1">
-                    <Clock size={14} />
-                    {movie.duration} phút
+                {/* Bottom */}
+                <div className="mt-4 text-center space-y-3">
+                    <h3 className="text-white font-semibold text-lg line-clamp-1">{movie.title}</h3>
+
+                    <div className="flex justify-center gap-3">
+                        {/* Trailer */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenTrailer(true);
+                            }}
+                            className="px-4 py-2 text-sm border border-zinc-700 text-zinc-300 rounded-full hover:bg-white hover:text-black transition"
+                        >
+                            Trailer
+                        </button>
+
+                        {/* Mua vé */}
+                        <button onClick={(e) => { e.stopPropagation();  navigate(`/movie/${movie.movie_id}`)}} className="px-4 py-2 text-sm bg-red-600 text-white rounded-full hover:bg-red-700 transition">
+                            Mua vé
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Thông tin */}
-            <div className="p-5">
-                <h3 className="font-bold text-lg text-white line-clamp-2 min-h-[56px] group-hover:text-red-500 transition-colors">
-                    {movie.title}
-                </h3>
+            {/* 🎬 Modal Trailer */}
+            {openTrailer && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                    <div className="relative w-[90%] md:w-[800px]">
+                        {/* Nút đóng */}
+                        <button
+                            onClick={() => setOpenTrailer(false)}
+                            className="absolute -top-10 right-0 text-white text-2xl"
+                        >
+                            ✖
+                        </button>
 
-                <div className="flex items-center gap-2 text-sm text-zinc-400 mt-2">
-                    <Calendar size={16} />
-                    <span>{new Date(movie.release_date).getFullYear()}</span>
-                    <span className="mx-2">•</span>
-                    <span>{movie.language}</span>
+                        {/* Video */}
+                        <iframe
+                            className="w-full h-[300px] md:h-[450px] rounded-xl"
+                            src={getEmbedUrl(movie.trailer_url)}
+                            title="Trailer"
+                            allowFullScreen
+                        ></iframe>
+                    </div>
                 </div>
-
-                {/* Nút hành động */}
-                <div className="flex gap-3 mt-6">
-                    <button className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2">
-                        <Ticket size={18} />
-                        Mua vé
-                    </button>
-                    
-                    <button className="flex-1 border border-zinc-700 hover:border-zinc-500 text-white font-medium py-3.5 rounded-xl transition-all">
-                        Chi tiết
-                    </button>
-                </div>
-            </div>
-        </div>
+            )}
+        </>
     );
 };
 
