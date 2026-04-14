@@ -41,7 +41,7 @@ export const movies = [
         status: 'now_showing',
         backdrop_url: 'https://i.ytimg.com/vi/0wuVwkK-Vsc/maxresdefault.jpg',
         genre: ['Tình cảm', 'Tâm lý'],
-        rating: 8.5,
+        rating: 7.0,
         actors: ['Đoàn Thiên Ân', ' Khương Lê', 'NSND Lê Khanh'],
         director: 'Lê Thiện Viễn',
         country: 'Việt Nam',
