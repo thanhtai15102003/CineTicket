@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { showtimes } from '../data/showtimes';
-import { movies } from '../data/movie';
-import SeatMap from '../components/SeatMap';
-import BookingProgress from '../components/BookingProgress'; 
+import { showtimes } from '../../data/showtimes';
+import { movies } from '../../data/movie';
+import SeatMap from '../../components/SeatMap';
+import BookingProgress from '../../components/BookingProgress';
 
 const Booking = () => {
     const { showtimeId } = useParams();

@@ -142,5 +142,19 @@ export const showtimes = [
         price: 95000,
         available_seats: 70,
         total_seats: 110
+    },
+    {
+        showtime_id: 109,
+        movie_id: 1,
+        cinema: 'CineTicket TP.HCM',
+        region: 'TP.HCM',
+        room: 'Phòng 1',
+        show_date: '2026-04-20', // Dùng định dạng YYYY-MM-DD để dễ sort
+        start_time: '09:30',
+        end_time: '11:45', // Thêm để biết thời lượng chiếu thực tế
+        format: '2D', // 2D / 3D / IMAX / 4DX...
+        price: 95000, // Giá vé chuẩn (đơn vị VND)
+        available_seats: 45, // Số ghế còn lại
+        total_seats: 120
     }
 ];

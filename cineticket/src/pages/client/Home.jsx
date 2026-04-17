@@ -1,7 +1,7 @@
 // src/pages/Home.jsx
 import { useState } from 'react';
-import Hero from '../components/Hero';
-import MovieSection from '../components/MovieSection';
+import Hero from '../../components/Hero';
+import MovieSection from '../../components/MovieSection';
 
 const Home = () => {
     const [showAll, setShowAll] = useState(false);

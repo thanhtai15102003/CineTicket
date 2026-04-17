@@ -11,12 +11,12 @@ const Login = () => {
             user_id: 1,
             username: 'admin',
             password_hash: '123456',
-            full_name: 'Nguyễn Thành Tài',
+            full_name: 'Thái Nguyễn Thành Tài',
             email: 'tai@gmail.com',
             phone: '0123456789',
             gender: 'Nam',
             date_of_birth: '2000-01-01',
-            role_id: 1,
+            role_id: 3,
             cinema_id: null,
             status: 'active',
             created_at: '2026-04-01'
@@ -25,15 +25,35 @@ const Login = () => {
             user_id: 2,
             username: 'user1',
             password_hash: '123456',
-            full_name: 'Trần Thị Bích',
-            email: 'bich@gmail.com',
+            full_name: 'Nguyễn Đức Tài',
+            email: 'ductai@gmail.com',
             phone: '0987654321',
-            gender: 'Nữ',
+            gender: 'Nam',
             date_of_birth: '1998-05-15',
-            role_id: 2,
+            role_id: 3,
             cinema_id: null,
             status: 'active',
             created_at: '2026-04-01'
+        },
+        {
+            user_id: 3,
+            username: 'admin',
+            password_hash: '123456',
+            full_name: 'Super Admin',
+            email: 'admin@gmail.com',
+            role_id: 1,
+            role_name: 'super_admin',
+            status: 'active'
+        },
+        {
+            user_id: 4,
+            username: 'staff',
+            password_hash: '123456',
+            full_name: 'Quản trị viên',
+            email: 'staff@gmail.com',
+            role_id: 2,
+            role_name: 'admin',
+            status: 'active'
         }
     ]);
 

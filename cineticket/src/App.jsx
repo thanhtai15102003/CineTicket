@@ -1,11 +1,15 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout';
-import Movies from './pages/Movies';
-import MovieDetail from './pages/MovieDetail';
-import Booking from './pages/Booking';
-import Login from './pages/Login';
+import Movies from './pages/client/Movies';
+import MovieDetail from './pages/client/MovieDetail';
+import Booking from './pages/client/Booking';
+import Login from './pages/client/Login';
 
-import Home from './pages/Home';
+import AdminLayout from './layouts/AdminLayout';
+import Dashboard from './pages/admin/DashBoard';
+import Users from './pages/admin/User';
+
+import Home from './pages/client/Home';
 
 function App() {
     return (
@@ -53,6 +57,25 @@ function App() {
                         <MainLayout>
                             <Login />
                         </MainLayout>
+                    }
+                />
+
+                {/* Trang admin dashboard */}
+                <Route
+                    path="/dashboard"
+                    element={
+                        <AdminLayout>
+                            <Dashboard />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý người dùng */}
+                <Route
+                    path="/admin/users"
+                    element={
+                        <AdminLayout>
+                            <Users />
+                        </AdminLayout>
                     }
                 />
             </Routes>

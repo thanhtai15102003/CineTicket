@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { movies } from '../data/movie';
-import { showtimes } from '../data/showtimes';
+import { movies } from '../../data/movie';
+import { showtimes } from '../../data/showtimes';
 
 const MovieDetail = () => {
     const { id } = useParams();

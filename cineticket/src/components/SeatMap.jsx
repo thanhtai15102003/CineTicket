@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 
 const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], timer = 0 }) => {
-    // 👉 Chỉ đến hàng G
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const cols = Array.from({ length: 14 }, (_, i) => i + 1);
 
@@ -17,9 +16,45 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
         return 95000;
     };
 
+    // 🚫 RULE: không tạo ghế trống ở giữa
+    const createsOrphanSeat = (row, col) => {
+        const currentRowSeats = cols.map((c) => `${row}${c}`);
+
+        // trạng thái sau khi click
+        const newSelected = new Set(selectedSeats.map((s) => s.id));
+        newSelected.add(`${row}${col}`);
+
+        const isBlocked = (seatId) => {
+            return soldSeats.has(seatId) || newSelected.has(seatId);
+        };
+
+        for (let i = 0; i < currentRowSeats.length; i++) {
+            const seat = currentRowSeats[i];
+
+            // ghế đang trống
+            if (!isBlocked(seat)) {
+                const left = currentRowSeats[i - 1];
+                const right = currentRowSeats[i + 1];
+
+                // nếu bị kẹp giữa 2 ghế đã chọn/bán → lỗi
+                if (left && right && isBlocked(left) && isBlocked(right)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    };
+
     const handleClick = (row, col) => {
         const seatId = `${row}${col}`;
         if (soldSeats.has(seatId)) return;
+
+        // 🚫 check orphan
+        if (createsOrphanSeat(row, col)) {
+            alert('Không được để ghế trống giữa 2 ghế!');
+            return;
+        }
 
         const seat = {
             id: seatId,
@@ -35,18 +70,17 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
 
     return (
         <div className="bg-zinc-900 p-6 md:p-10 rounded-2xl shadow-lg">
-            {/* 🎬 SCREEN */}
+            {/* SCREEN */}
             <div className="w-full max-w-[700px] mx-auto mb-10">
                 <div className="bg-gradient-to-r from-zinc-600 to-zinc-400 text-center py-3 rounded-t-full text-sm tracking-[0.3em] text-black font-semibold shadow-md">
                     SCREEN
                 </div>
             </div>
 
-            {/* 🎟️ SEATS */}
+            {/* SEATS */}
             <div className="space-y-3">
                 {rows.map((row) => (
                     <div key={row} className="flex items-center justify-center gap-3">
-                        {/* Row label trái */}
                         <span className="w-5 text-zinc-500 text-xs">{row}</span>
 
                         <div className="flex gap-1.5">
@@ -87,13 +121,12 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
                             })}
                         </div>
 
-                        {/* Row label phải */}
                         <span className="w-5 text-zinc-500 text-xs">{row}</span>
                     </div>
                 ))}
             </div>
 
-            {/* 🎯 LEGEND */}
+            {/* LEGEND */}
             <div className="flex flex-wrap justify-center gap-6 mt-10 text-xs text-zinc-300">
                 <div className="flex items-center gap-2">
                     <div className="w-5 h-5 bg-zinc-800 rounded"></div> Thường

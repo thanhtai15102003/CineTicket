@@ -1,7 +1,7 @@
 // src/pages/Movies.jsx
 import { useState, useEffect } from 'react';
-import MovieSection from '../components/MovieSection';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import MovieSection from '../../components/MovieSection';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const Movies = () => {
     const [isLoading, setIsLoading] = useState(true);
