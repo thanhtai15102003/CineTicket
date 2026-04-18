@@ -209,8 +209,6 @@ const Users = () => {
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
-            <h2 className="text-3xl font-bold mb-8">Quản lý Tài khoản Admin</h2>
-
             {errorMessage && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl mb-6">
                     {errorMessage}

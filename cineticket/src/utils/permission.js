@@ -1,5 +1,5 @@
 export const permissions = {
-    super_admin: ['manage_users'],
+    super_admin: ['manage_users', 'manage_cinemas', 'manage_movies'],
     admin: [],
     user: []
 };
