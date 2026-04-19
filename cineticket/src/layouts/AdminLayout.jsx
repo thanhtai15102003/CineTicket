@@ -11,7 +11,8 @@ import {
     Building2,
     Map,
     ChevronDown,
-    Clapperboard
+    Clapperboard,
+    Building
 } from 'lucide-react';
 
 import { hasPermission } from '../utils/permission';
@@ -38,6 +39,23 @@ const AdminLayout = ({ children }) => {
         else navigate('/login');
     }, [navigate]);
 
+    const getRequiredPermission = (pathname) => {
+        if (pathname === '/dashboard') return null;
+        if (pathname.startsWith('/admin/users')) return 'manage_users';
+        if (pathname.startsWith('/admin/movies')) return 'manage_movies';
+        if (pathname.startsWith('/admin/areas') || pathname.startsWith('/admin/cinemas')) return 'manage_cinemas';
+        return null;
+    };
+
+    useEffect(() => {
+        if (currentUser) {
+            const requiredPerm = getRequiredPermission(location.pathname);
+            if (requiredPerm && !hasPermission(currentUser, requiredPerm)) {
+                navigate('/dashboard');
+            }
+        }
+    }, [currentUser, location.pathname, navigate]);
+
     const handleLogout = () => {
         localStorage.removeItem('currentUser');
         navigate('/login');
@@ -53,7 +71,7 @@ const AdminLayout = ({ children }) => {
                 <div className="w-11 h-11 bg-red-600 rounded-2xl flex items-center justify-center text-white font-bold">
                     🎬
                 </div>
-
+                {/* ===== Admin Tổng ===== */}
                 {/* Dashboard */}
                 <NavItem
                     to="/dashboard"
@@ -62,7 +80,6 @@ const AdminLayout = ({ children }) => {
                     pathname={location.pathname}
                     exact
                 />
-
                 {/* ===== GROUP RẠP ===== */}
                 {hasPermission(currentUser, 'manage_cinemas') && (
                     <NavGroup pathname={location.pathname}>
@@ -104,15 +121,6 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
-
-                {/* Doanh thu */}
-                {/* <NavItem
-                    to="/admin/revenue"
-                    icon={<BarChart3 size={22} />}
-                    label="Doanh thu"
-                    pathname={location.pathname}
-                /> */}
-
                 {/* Users */}
                 {hasPermission(currentUser, 'manage_users') && (
                     <NavItem
@@ -123,13 +131,16 @@ const AdminLayout = ({ children }) => {
                     />
                 )}
 
-                {/* Settings */}
-                {/* <NavItem
-                    to="/admin/settings"
-                    icon={<Settings size={22} />}
-                    label="Cài đặt"
-                    pathname={location.pathname}
-                /> */}
+                {/* ===== Admin Chi Nhánh ===== */}
+                {/* Quản lý phòng */}
+                {hasPermission(currentUser, 'manage_rooms') && (
+                    <NavItem
+                        to="/admin/rooms"
+                        icon={<Building size={22} />}
+                        label="Room"
+                        pathname={location.pathname}
+                    />
+                )}
             </aside>
 
             {/* ===== MAIN ===== */}

@@ -13,7 +13,8 @@ import Areas from './pages/admin/Areas';
 import Cinemas from './pages/admin/Cinemas';
 import MoviesAdmin from './pages/admin/Movie';
 
-
+import Rooms from './pages/admin/Rooms';
+import SeatLayout from './pages/admin/SeatLayout';
 
 function App() {
     return (
@@ -96,7 +97,7 @@ function App() {
                     path="/admin/cinemas"
                     element={
                         <AdminLayout>
-                           <Cinemas />
+                            <Cinemas />
                         </AdminLayout>
                     }
                 />
@@ -107,6 +108,25 @@ function App() {
                     element={
                         <AdminLayout>
                             <MoviesAdmin />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý phòng của admin chi nhánh */}
+                {/* Quản lý phòng */}
+                <Route
+                    path="/admin/rooms"
+                    element={
+                        <AdminLayout>
+                            <Rooms />
+                        </AdminLayout>
+                    }
+                />
+                {/* Quản lý sơ đồ ghế */}
+                <Route
+                    path="/admin/seat-layout/:id"
+                    element={
+                        <AdminLayout>
+                            <SeatLayout />
                         </AdminLayout>
                     }
                 />

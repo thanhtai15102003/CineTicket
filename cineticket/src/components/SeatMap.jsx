@@ -1,56 +1,82 @@
-import { useEffect } from 'react';
+import { IconArmchair, IconArmchair2, IconSofa } from '@tabler/icons-react';
 
 const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], timer = 0 }) => {
     const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const cols = Array.from({ length: 14 }, (_, i) => i + 1);
 
     const soldSeats = new Set(['G8', 'G9', 'F8', 'F9']);
-    const vipSeats = new Set(['F12', 'F13', 'F14', 'G12', 'G13', 'G14']);
+    const vipSeats = new Set(['F12', 'F13', 'F14']);
+    const doubleRows = new Set(['G']); // 👈 hàng ghế đôi
 
     const isSelected = (seatId) => selectedSeats.some((s) => s.id === seatId);
     const isHeld = (seatId) => heldSeats.includes(seatId);
 
     const getPrice = (row, col) => {
+        if (doubleRows.has(row)) return 180000;
         if (vipSeats.has(`${row}${col}`)) return 130000;
         if (['A', 'B'].includes(row)) return 75000;
         return 95000;
     };
 
-    // 🚫 RULE: không tạo ghế trống ở giữa
+    // 🚫 RULE orphan (không áp dụng cho ghế đôi)
     const createsOrphanSeat = (row, col) => {
         const currentRowSeats = cols.map((c) => `${row}${c}`);
 
-        // trạng thái sau khi click
         const newSelected = new Set(selectedSeats.map((s) => s.id));
         newSelected.add(`${row}${col}`);
 
-        const isBlocked = (seatId) => {
-            return soldSeats.has(seatId) || newSelected.has(seatId);
-        };
+        const isBlocked = (seatId) => soldSeats.has(seatId) || newSelected.has(seatId);
+
+        let emptyCount = 0;
 
         for (let i = 0; i < currentRowSeats.length; i++) {
             const seat = currentRowSeats[i];
 
-            // ghế đang trống
             if (!isBlocked(seat)) {
-                const left = currentRowSeats[i - 1];
-                const right = currentRowSeats[i + 1];
-
-                // nếu bị kẹp giữa 2 ghế đã chọn/bán → lỗi
-                if (left && right && isBlocked(left) && isBlocked(right)) {
-                    return true;
-                }
+                emptyCount++;
+            } else {
+                // nếu đoạn ghế trống = 1 → orphan
+                if (emptyCount === 1) return true;
+                emptyCount = 0;
             }
         }
+
+        // check cuối hàng
+        if (emptyCount === 1) return true;
 
         return false;
     };
 
     const handleClick = (row, col) => {
+        const isDouble = doubleRows.has(row);
+
+        // 👉 GHẾ ĐÔI
+        if (isDouble) {
+            const start = col % 2 === 0 ? col - 1 : col;
+            const pair = [`${row}${start}`, `${row}${start + 1}`];
+
+            // nếu 1 trong 2 ghế đã bán → block
+            if (pair.some((id) => soldSeats.has(id))) return;
+
+            pair.forEach((id, i) => {
+                const seat = {
+                    id,
+                    row,
+                    number: start + i,
+                    label: id,
+                    price: getPrice(row, col),
+                    type: 'double'
+                };
+                onSeatSelect(seat);
+            });
+
+            return;
+        }
+
+        // 👉 GHẾ THƯỜNG
         const seatId = `${row}${col}`;
         if (soldSeats.has(seatId)) return;
 
-        // 🚫 check orphan
         if (createsOrphanSeat(row, col)) {
             alert('Không được để ghế trống giữa 2 ghế!');
             return;
@@ -60,7 +86,7 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
             id: seatId,
             row,
             number: col,
-            label: `${row}${col}`,
+            label: seatId,
             price: getPrice(row, col),
             type: vipSeats.has(seatId) ? 'vip' : 'regular'
         };
@@ -78,44 +104,74 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
             </div>
 
             {/* SEATS */}
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {rows.map((row) => (
                     <div key={row} className="flex items-center justify-center gap-3">
                         <span className="w-5 text-zinc-500 text-xs">{row}</span>
 
-                        <div className="flex gap-1.5">
+                        <div className="flex gap-2">
                             {cols.map((col) => {
+                                const isDouble = doubleRows.has(row);
+
+                                // 👉 render ghế đôi chỉ 1 lần / cặp
+                                if (isDouble && col % 2 === 0) return null;
+
                                 const seatId = `${row}${col}`;
-                                const sold = soldSeats.has(seatId);
-                                const vip = vipSeats.has(seatId);
-                                const selected = isSelected(seatId);
-                                const held = isHeld(seatId);
+                                const pairId = isDouble ? `${row}${col}-${col + 1}` : seatId;
 
-                                let style =
-                                    'w-8 h-8 flex items-center justify-center text-[10px] rounded-md transition-all duration-200';
+                                const sold = isDouble
+                                    ? soldSeats.has(`${row}${col}`) ||
+                                      soldSeats.has(`${row}${col + 1}`)
+                                    : soldSeats.has(seatId);
 
-                                if (sold) {
-                                    style += ' bg-zinc-700 text-zinc-500 cursor-not-allowed';
-                                } else if (selected) {
-                                    style +=
-                                        ' bg-red-600 text-white scale-110 shadow-lg cursor-pointer';
-                                } else if (held) {
-                                    style += ' bg-yellow-400 text-black cursor-pointer';
-                                } else if (vip) {
-                                    style +=
-                                        ' bg-orange-400 hover:bg-orange-500 text-black cursor-pointer hover:-translate-y-1';
-                                } else {
-                                    style +=
-                                        ' bg-zinc-800 hover:bg-zinc-600 text-white cursor-pointer hover:-translate-y-1';
-                                }
+                                const selected = isDouble
+                                    ? isSelected(`${row}${col}`) && isSelected(`${row}${col + 1}`)
+                                    : isSelected(seatId);
+
+                                let stateClass = '';
+
+                                if (sold) stateClass = 'text-zinc-700 cursor-not-allowed';
+                                else if (selected) stateClass = 'text-white scale-110';
+                                else stateClass = 'text-zinc-400 hover:text-white';
 
                                 return (
                                     <div
-                                        key={col}
-                                        className={style}
+                                        key={pairId}
                                         onClick={() => handleClick(row, col)}
+                                        className="relative group cursor-pointer transition-all duration-200"
                                     >
-                                        {col}
+                                        {/* ICON */}
+                                        {isDouble ? (
+                                            <IconSofa
+                                                size={34}
+                                                className={`transition ${stateClass}`}
+                                            />
+                                        ) : vipSeats.has(seatId) ? (
+                                            <IconArmchair2
+                                                size={26}
+                                                className={`transition ${stateClass}`}
+                                            />
+                                        ) : (
+                                            <IconArmchair
+                                                size={26}
+                                                className={`transition ${stateClass}`}
+                                            />
+                                        )}
+
+                                        {/* TOOLTIP */}
+                                        <div
+                                            className="
+                                            absolute -top-6 left-1/2 -translate-x-1/2
+                                            text-[10px] px-2 py-0.5 rounded bg-black text-white
+                                            opacity-0 group-hover:opacity-100 transition pointer-events-none
+                                        "
+                                        >
+                                            {isDouble ? pairId : seatId}
+                                        </div>
+
+                                        {selected && (
+                                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full"></div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -128,24 +184,23 @@ const SeatMap = ({ showtime, selectedSeats = [], onSeatSelect, heldSeats = [], t
 
             {/* LEGEND */}
             <div className="flex flex-wrap justify-center gap-6 mt-10 text-xs text-zinc-300">
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-zinc-800 rounded"></div> Thường
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-orange-400 rounded"></div> VIP
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-red-600 rounded"></div> Đang chọn
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-yellow-400 rounded"></div> Giữ ({timer}s)
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-zinc-700 rounded"></div> Đã bán
-                </div>
+                <Legend icon={<IconArmchair size={20} />} label="Thường" />
+                <Legend icon={<IconArmchair2 size={20} />} label="VIP" />
+                <Legend icon={<IconSofa size={22} />} label="Ghế đôi" />
+                <Legend dot label="Đang chọn" />
+                <Legend color="bg-zinc-700" label="Đã bán" />
             </div>
         </div>
     );
 };
+
+const Legend = ({ icon, label, dot, color }) => (
+    <div className="flex items-center gap-2">
+        {icon && <div>{icon}</div>}
+        {dot && <div className="w-2 h-2 bg-white rounded-full"></div>}
+        {color && <div className={`w-4 h-4 rounded ${color}`}></div>}
+        <span>{label}</span>
+    </div>
+);
 
 export default SeatMap;
