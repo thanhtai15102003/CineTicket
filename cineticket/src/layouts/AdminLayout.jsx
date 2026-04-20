@@ -7,12 +7,14 @@ import {
     BarChart3,
     Settings,
     LogOut,
+    Layout,
     Film,
     Building2,
     Map,
     ChevronDown,
     Clapperboard,
-    Building
+    Building,
+    Clock
 } from 'lucide-react';
 
 import { hasPermission } from '../utils/permission';
@@ -29,7 +31,9 @@ const AdminLayout = ({ children }) => {
         if (pathname.startsWith('/admin/tickets')) return 'Quản lý phim';
         if (pathname.startsWith('/admin/revenue')) return 'Doanh thu';
         if (pathname.startsWith('/admin/users')) return 'Quản Lý Tài Khoản Người Dùng';
-        if (pathname.startsWith('/admin/settings')) return 'Cài đặt';
+        if (pathname.startsWith('/admin/rooms')) return 'Quản lý phòng chiếu';
+        if (pathname.startsWith('/admin/seat-layout')) return 'Quản lý sơ đồ ghế';
+        if (pathname.startsWith('/admin/showtimes')) return 'Quản lý suất chiếu';
         return 'Dashboard';
     };
 
@@ -138,6 +142,24 @@ const AdminLayout = ({ children }) => {
                         to="/admin/rooms"
                         icon={<Building size={22} />}
                         label="Room"
+                        pathname={location.pathname}
+                    />
+                )}
+                {/* Quản lý sơ đồ ghế */}
+                {hasPermission(currentUser, 'manage_seat_layouts') && (
+                    <NavItem
+                        to="/admin/seat-layout"
+                        icon={<Layout size={22} />}
+                        label="Seat Layout"
+                        pathname={location.pathname}
+                    />
+                )}
+                {/* Quản lý suất chiếu */}
+                {hasPermission(currentUser, 'manage_showtimes') && (
+                    <NavItem
+                        to="/admin/showtimes"
+                        icon={<Clock size={22} />}
+                        label="Showtime"
                         pathname={location.pathname}
                     />
                 )}

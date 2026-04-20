@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Toast from '../../components/common/Toast';
 
 const layoutOptions = [
-    { value: 'small', label: 'Nhỏ', capacity: 80 },
-    { value: 'medium', label: 'Trung bình', capacity: 120 },
-    { value: 'large', label: 'Lớn', capacity: 180 }
+    { value: '', label: 'Chọn mẫu sơ đồ ghế', capacity: 0 },
+    { value: 'small', label: 'Mẫu sơ đồ ghế vừa', capacity: 80 },
+    { value: 'medium', label: 'Mẫu sơ đồ ghế trung bình', capacity: 120 },
+    { value: 'large', label: 'Mẫu sơ đồ ghế lớn', capacity: 180 }
 ];
 
 export function CreateRoomModal({ onClose, onCreate }) {
@@ -11,24 +14,54 @@ export function CreateRoomModal({ onClose, onCreate }) {
     const [type, setType] = useState('2D');
     const [layout, setLayout] = useState(layoutOptions[0]);
 
+    // 👉 Toast state
+    const [toast, setToast] = useState({
+        show: false,
+        message: ''
+    });
+
+    const navigate = useNavigate();
+
+    const generateId = () => Math.random().toString(36).substring(2, 9);
+
     const handleCreate = () => {
         if (!name) return alert('Nhập tên phòng');
 
-        onCreate({
-            id: Date.now(),
+        const newRoom = {
+            id: generateId(),
             name,
             cinema: 'Chi nhánh hiện tại',
             type,
             capacity: layout.capacity,
             status: true,
             layout: layout.value
+        };
+
+        onCreate(newRoom);
+
+        // 👉 show toast
+        setToast({
+            show: true,
+            message: 'Tạo phòng thành công 🎉'
         });
 
-        onClose();
+        // 👉 delay rồi chuyển trang
+        setTimeout(() => {
+            navigate(`/admin/seat-layout/${newRoom.id}`);
+            onClose();
+        }, 1000);
     };
 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+            {/* 🔥 TOAST */}
+            {toast.show && (
+                <Toast
+                    message={toast.message}
+                    onClose={() => setToast({ show: false, message: '' })}
+                />
+            )}
+
             <div className="bg-white w-[450px] p-6 rounded-xl">
                 <h2 className="text-lg font-semibold mb-4">Tạo phòng chiếu</h2>
 
@@ -58,7 +91,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
                     </select>
                 </div>
 
-                {/* Mẫu sơ đồ ghế */}
+                {/* Layout */}
                 <div className="mb-4">
                     <label className="text-sm text-gray-500">Mẫu sơ đồ ghế</label>
                     <select
@@ -75,7 +108,6 @@ export function CreateRoomModal({ onClose, onCreate }) {
                         ))}
                     </select>
 
-                    {/* Hiển thị sức chứa */}
                     <div className="text-sm text-gray-400 mt-1">
                         Sức chứa: {layout.capacity} ghế
                     </div>

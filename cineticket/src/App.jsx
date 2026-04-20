@@ -12,6 +12,10 @@ import Users from './pages/admin/User';
 import Areas from './pages/admin/Areas';
 import Cinemas from './pages/admin/Cinemas';
 import MoviesAdmin from './pages/admin/Movie';
+import SeatLayoutManagement from './pages/admin/SeatLayoutManagement';
+import SeatLayoutEditor from './pages/admin/SeatLayoutEditor';
+import ShowtimeManagement from './pages/admin/ShowtimeManagement';
+import CreateShowtime from './pages/admin/CreateShowtime';
 
 import Rooms from './pages/admin/Rooms';
 import SeatLayout from './pages/admin/SeatLayout';
@@ -127,6 +131,41 @@ function App() {
                     element={
                         <AdminLayout>
                             <SeatLayout />
+                        </AdminLayout>
+                    }
+                />
+                <Route
+                    path="/admin/seat-layout"
+                    element={
+                        <AdminLayout>
+                            <SeatLayoutManagement />
+                        </AdminLayout>
+                    }
+                />
+                <Route
+                    path="/admin/seat-layout/:id/edit"
+                    element={
+                        <AdminLayout>
+                            <SeatLayoutEditor />
+                        </AdminLayout>
+                    }
+                />
+
+                {/* Trang quản lý suất chiếu */}
+                <Route
+                    path="/admin/showtimes"
+                    element={
+                        <AdminLayout>
+                            <ShowtimeManagement />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang tạo suất chiếu */}
+                <Route
+                    path="/admin/showtimes/create"
+                    element={
+                        <AdminLayout>
+                            <CreateShowtime />
                         </AdminLayout>
                     }
                 />
