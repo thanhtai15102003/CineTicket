@@ -1,5 +1,12 @@
-import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Pencil, Search } from 'lucide-react';
+import axios from 'axios';
+
+import Toast from '../../components/common/Toast';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Pagination from '../../components/common/Pagination';
+
+const BASE_URL = 'https://cinema-api-production-f2bc.up.railway.app/api/v1';
 
 const Cinemas = () => {
     const [search, setSearch] = useState('');
@@ -8,73 +15,202 @@ const Cinemas = () => {
     const [form, setForm] = useState({
         cinema_name: '',
         branch: '',
-        address: ''
+        address: '',
+        phone: ''
     });
 
-    // 👉 Mock data
-    const [cinemas, setCinemas] = useState([
-        {
-            id: 1,
-            cinema_name: 'CGV',
-            branch: 'TP HCM',
-            address: '123 Nguyễn Huệ Quận 1',
-            status: 1
-        },
-        {
-            id: 2,
-            cinema_name: 'Lotte',
-            branch: 'TP HCM',
-            address: '456 Nguyễn Thị Thập Quận 7',
-            status: 0
-        }
-    ]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5; // số dòng mỗi trang
 
-    // 👉 Toggle
-    const toggleStatus = (id) => {
-        setCinemas((prev) =>
-            prev.map((item) =>
-                item.id === id ? { ...item, status: item.status === 1 ? 0 : 1 } : item
-            )
-        );
+    const [cinemas, setCinemas] = useState([]);
+    const [regions, setRegions] = useState([]);
+
+    const [isEdit, setIsEdit] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    const [toast, setToast] = useState({
+        show: false,
+        message: ''
+    });
+
+    const showToast = (msg) => {
+        setToast({ show: true, message: msg });
     };
 
-    // 👉 Add
-    const handleAdd = () => {
-        if (!form.cinema_name.trim()) return;
+    useEffect(() => {
+        fetchCinemas();
+        fetchRegions();
+    }, []);
 
-        const newItem = {
-            id: Date.now(),
-            ...form,
-            status: 1
-        };
+    // ================== GET CINEMAS ==================
+    const fetchCinemas = async () => {
+        try {
+            setLoading(true);
 
-        setCinemas([newItem, ...cinemas]);
+            const token = localStorage.getItem('token');
 
+            const res = await axios.get(`${BASE_URL}/admin/cinemas`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            const mapped = res.data.data.map((item) => ({
+                id: item.cinema_id,
+                cinema_name: item.cinema_name,
+                branch: item.region?.full_location || '---',
+                region_id: item.region?.region_id || '',
+                address: item.address,
+                phone: item.phone || '',
+                status: item.status
+            }));
+
+            setCinemas(mapped);
+        } catch {
+            showToast('Lỗi load dữ liệu ❌');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ================== GET REGIONS ==================
+    const fetchRegions = async () => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const res = await axios.get(`${BASE_URL}/admin/regions`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            setRegions(res.data.data);
+        } catch {
+            showToast('Lỗi load khu vực ❌');
+        }
+    };
+
+    // ================== TOGGLE STATUS ==================
+    const toggleStatus = async (id, currentStatus) => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+            await axios.patch(
+                `${BASE_URL}/admin/cinemas/${id}/status`,
+                { status: newStatus },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            setCinemas((prev) =>
+                prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+            );
+
+            showToast('Cập nhật trạng thái 🎉');
+        } catch {
+            showToast('Lỗi cập nhật ❌');
+        }
+    };
+
+    // ================== ADD / UPDATE ==================
+    const handleSubmit = async () => {
+        if (!form.cinema_name.trim()) {
+            showToast('Nhập tên rạp ❗');
+            return;
+        }
+        if (!form.branch) {
+            showToast('Chọn khu vực ❗');
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+
+            const token = localStorage.getItem('token');
+
+            if (isEdit) {
+                await axios.put(
+                    `${BASE_URL}/admin/cinemas/${editingId}`,
+                    {
+                        cinema_name: form.cinema_name,
+                        address: form.address,
+                        phone: form.phone,
+                        region_id: form.branch
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                showToast('Cập nhật thành công 🎉');
+            } else {
+                await axios.post(
+                    `${BASE_URL}/admin/cinemas`,
+                    {
+                        cinema_name: form.cinema_name,
+                        address: form.address,
+                        phone: form.phone,
+                        region_id: form.branch
+                    },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                showToast('Tạo thành công 🎉');
+            }
+
+            fetchCinemas();
+            setOpenModal(false);
+            resetForm();
+        } catch {
+            showToast('Thất bại ❌');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    // ================== EDIT ==================
+    const handleEdit = (item) => {
+        setForm({
+            cinema_name: item.cinema_name,
+            branch: item.region_id,
+            address: item.address,
+            phone: item.phone
+        });
+
+        setEditingId(item.id);
+        setIsEdit(true);
+        setOpenModal(true);
+    };
+
+    const resetForm = () => {
         setForm({
             cinema_name: '',
             branch: '',
-            address: ''
+            address: '',
+            phone: ''
         });
-
-        setOpenModal(false);
+        setIsEdit(false);
+        setEditingId(null);
     };
 
     const filtered = cinemas.filter((c) =>
         (c.cinema_name + c.branch).toLowerCase().includes(search.toLowerCase())
     );
+    // ===== PAGINATION =====
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
 
     return (
         <div className="space-y-6">
             {/* HEADER */}
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold">Danh Sách Rạp Chiếu</h2>
+            <div className="flex justify-between">
+                <h2 className="text-2xl font-semibold">Danh Sách Rạp</h2>
 
                 <button
-                    onClick={() => setOpenModal(true)}
+                    onClick={() => {
+                        resetForm();
+                        setOpenModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg"
                 >
-                    <Plus size={18} />
-                    Tạo rạp
+                    <Plus size={18} /> Tạo rạp
                 </button>
             </div>
 
@@ -82,104 +218,141 @@ const Cinemas = () => {
             <div className="relative w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                    type="text"
-                    placeholder="Tìm rạp..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
+                    placeholder="Tìm rạp..."
+                    className="w-full pl-9 pr-3 py-2 border rounded-lg"
                 />
             </div>
 
             {/* TABLE */}
-            <div className="bg-white rounded-xl border overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-600">
-                        <tr>
-                            <th className="px-4 py-3 text-left">Rạp</th>
-                            <th className="px-4 py-3 text-left">Chi nhánh</th>
-                            <th className="px-4 py-3 text-left">Địa chỉ</th>
-                            <th className="px-4 py-3 text-center">Hoạt động</th>
-                            <th className="px-4 py-3 text-center">Hành động</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {filtered.map((item) => (
-                            <tr key={item.id} className="border-t hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium">{item.cinema_name}</td>
-
-                                <td className="px-4 py-3">{item.branch}</td>
-
-                                <td className="px-4 py-3">{item.address}</td>
-
-                                {/* TOGGLE */}
-                                <td className="px-4 py-3 text-center">
-                                    <button
-                                        onClick={() => toggleStatus(item.id)}
-                                        className={`relative w-11 h-6 rounded-full
-                                        ${item.status ? 'bg-green-500' : 'bg-gray-300'}`}
-                                    >
-                                        <span
-                                            className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition
-                                            ${item.status ? 'translate-x-5' : ''}`}
-                                        />
-                                    </button>
-                                </td>
-
-                                <td className="px-4 py-3">
-                                    <div className="flex justify-center gap-3">
-                                        <Pencil
-                                            size={16}
-                                            className="text-blue-500 cursor-pointer"
-                                        />
-                                        <Trash2 size={16} className="text-red-500 cursor-pointer" />
-                                    </div>
-                                </td>
+            {loading ? (
+                <LoadingSpinner />
+            ) : (
+                <div className="bg-white rounded-xl border overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-3 text-left">Rạp</th>
+                                <th className="px-4 py-3 text-left">Chi nhánh</th>
+                                <th className="px-4 py-3 text-left">Địa chỉ</th>
+                                <th className="px-4 py-3 text-left">SĐT</th>
+                                <th className="px-4 py-3 text-center">Trạng thái</th>
+                                <th className="px-4 py-3 text-center">Hành động</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+
+                        <tbody>
+                            {paginatedData.map((item) => (
+                                <tr key={item.id} className="border-t hover:bg-gray-50">
+                                    <td className="px-4 py-3">{item.cinema_name}</td>
+                                    <td className="px-4 py-3">{item.branch}</td>
+                                    <td className="px-4 py-3">{item.address}</td>
+                                    <td className="px-4 py-3">{item.phone}</td>
+
+                                    {/* STATUS */}
+                                    <td className="px-4 py-3 text-center">
+                                        <button
+                                            onClick={() => toggleStatus(item.id, item.status)}
+                                            className={`w-11 h-6 rounded-full ${
+                                                item.status === 'active'
+                                                    ? 'bg-green-500'
+                                                    : 'bg-gray-300'
+                                            }`}
+                                        >
+                                            <span
+                                                className={`block w-4 h-4 bg-white rounded-full transition ${
+                                                    item.status === 'active' ? 'translate-x-5' : ''
+                                                }`}
+                                            />
+                                        </button>
+                                    </td>
+
+                                    {/* ACTION */}
+                                    <td className="px-4 py-3">
+                                        <div className="flex justify-center">
+                                            <Pencil
+                                                size={16}
+                                                className="text-blue-500 cursor-pointer"
+                                                onClick={() => handleEdit(item)}
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {!loading && totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={(page) => setCurrentPage(page)}
+                        />
+                    )}
+                </div>
+            )}
 
             {/* MODAL */}
             {openModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-                    <div className="bg-white w-[400px] p-6 rounded-xl space-y-3">
-                        <h3 className="font-semibold text-lg">Tạo rạp</h3>
+                    <div className="bg-white p-6 rounded-xl space-y-4 w-[400px]">
+                        <h3 className="font-semibold">{isEdit ? 'Chỉnh sửa rạp' : 'Tạo rạp'}</h3>
 
                         <input
-                            placeholder="Tên rạp"
                             value={form.cinema_name}
                             onChange={(e) => setForm({ ...form, cinema_name: e.target.value })}
+                            placeholder="Tên rạp"
                             className="w-full border p-2 rounded"
                         />
 
-                        <input
-                            placeholder="Chi nhánh"
+                        <select
                             value={form.branch}
                             onChange={(e) => setForm({ ...form, branch: e.target.value })}
                             className="w-full border p-2 rounded"
-                        />
+                        >
+                            <option value="">Chọn khu vực</option>
+                            {regions.map((r) => (
+                                <option key={r.region_id} value={r.region_id}>
+                                    {r.full_location}
+                                </option>
+                            ))}
+                        </select>
 
                         <input
-                            placeholder="Địa chỉ"
                             value={form.address}
                             onChange={(e) => setForm({ ...form, address: e.target.value })}
+                            placeholder="Địa chỉ"
                             className="w-full border p-2 rounded"
                         />
 
-                        <div className="flex justify-end gap-2 pt-2">
+                        <input
+                            value={form.phone}
+                            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                            placeholder="SĐT"
+                            className="w-full border p-2 rounded"
+                        />
+
+                        <div className="flex justify-end gap-2">
                             <button onClick={() => setOpenModal(false)}>Huỷ</button>
 
                             <button
-                                onClick={handleAdd}
+                                onClick={handleSubmit}
+                                disabled={submitting}
                                 className="bg-red-600 text-white px-4 py-2 rounded"
                             >
-                                Thêm
+                                {submitting ? 'Đang xử lý...' : isEdit ? 'Cập nhật' : 'Thêm'}
                             </button>
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* TOAST */}
+            {toast.show && (
+                <Toast
+                    message={toast.message}
+                    onClose={() => setToast({ show: false, message: '' })}
+                />
             )}
         </div>
     );

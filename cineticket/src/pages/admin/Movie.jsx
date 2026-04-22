@@ -1,45 +1,132 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
 
 const Films = () => {
     const [search, setSearch] = useState('');
     const [openModal, setOpenModal] = useState(false);
 
+    const [genres, setGenres] = useState([]);
+    const [selectedGenres, setSelectedGenres] = useState([]);
+
     const [form, setForm] = useState({
         title: '',
         director: '',
         actors: '',
         duration: '',
-        genre: '',
+        genre_ids: [],
         age_limit: '',
         release_date: '',
         end_date: '',
         description: '',
         poster_url: '',
+        backdrop_url: '',
         trailer_url: ''
     });
 
-    // 👉 Mock data chuẩn
-    const [films, setFilms] = useState([
-        {
-            movie_id: 1,
-            title: 'HẸN EM NGÀY NHẬT THỰC',
-            duration: 118,
-            description: 'Phim tình cảm Việt Nam',
-            release_date: '2026-03-30',
-            end_date: '2026-06-30',
-            age_limit: '16+',
-            poster_url:
-                'https://cinestar.com.vn/_next/image/?url=https%3A%2F%2Fapi-website.cinestar.com.vn%2Fmedia%2Fwysiwyg%2FPosters%2F04-2026%2Fhen-em.jpg&w=1920&q=75',
-            trailer_url: 'https://www.youtube.com/watch?v=snG3te8ByyQ',
-            status: 'now_showing',
-            genre: ['Tình cảm', 'Tâm lý'],
-            actors: ['Đoàn Thiên Ân', 'Khương Lê'],
-            director: 'Lê Thiện Viễn'
-        }
-    ]);
+    const [films, setFilms] = useState([]);
 
-    // 👉 Toggle
+
+    const toggleGenre = (id) => {
+        setForm((prev) => ({
+            ...prev,
+            genre_ids: prev.genre_ids.includes(id)
+                ? prev.genre_ids.filter((g) => g !== id) // nếu đã có thì bỏ
+                : [...prev.genre_ids, id] // nếu chưa có thì thêm
+        }));
+    };
+    // ================== FETCH MOVIES (FIX TOKEN) ==================
+    useEffect(() => {
+        const fetchMovies = async () => {
+            try {
+                const token = localStorage.getItem('token');
+
+                const res = await fetch(
+                    'https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies',
+                    {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            Accept: 'application/json'
+                        }
+                    }
+                );
+
+                const json = await res.json();
+
+                if (!res.ok) {
+                    console.error('API error:', json);
+                    setFilms([]);
+                    return;
+                }
+
+                // ✅ FIX: always safe array
+                const movies = Array.isArray(json?.data) ? json.data : [];
+
+                const formatted = movies.map((m) => ({
+                    movie_id: m.movie_id,
+                    title: m.title || '',
+                    duration: m.duration || 0,
+                    description: m.description || '',
+                    release_date: m.release_date || '',
+                    end_date: m.end_date || '',
+                    age_limit: m.age_limit || '',
+                    poster_url: m.poster_url || 'https://via.placeholder.com/100x150?text=No+Image',
+                    trailer_url: m.trailer_url || '#',
+
+                    director: m.director || 'N/A',
+
+                    // ✅ FIX NULL SAFE
+                    actors: Array.isArray(m.actors)
+                        ? m.actors
+                        : typeof m.actors === 'string'
+                          ? m.actors.split(',')
+                          : [],
+
+                    genre: Array.isArray(m.genres) ? m.genres : [],
+
+                    status: m.status === 'active' ? 'now_showing' : 'inactive'
+                }));
+
+                setFilms(formatted);
+            } catch (err) {
+                console.error('Lỗi fetch movies:', err);
+                setFilms([]);
+            }
+        };
+
+        fetchMovies();
+    }, []);
+
+    // ================== FETCH GENRES (FIX TOKEN) ==================
+    useEffect(() => {
+        fetchGenres();
+    }, []);
+
+    const fetchGenres = async () => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const res = await fetch(
+                'https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/genres',
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json'
+                    }
+                }
+            );
+
+            const json = await res.json();
+
+            const data = Array.isArray(json?.data) ? json.data : [];
+
+            setGenres(data);
+        } catch (err) {
+            console.error('Lỗi genres:', err);
+        }
+    };
+
+    // ================== TOGGLE STATUS (FRONTEND ONLY) ==================
     const toggleStatus = (id) => {
         setFilms((prev) =>
             prev.map((item) =>
@@ -53,39 +140,76 @@ const Films = () => {
         );
     };
 
-    // 👉 Add
-    const handleAdd = () => {
-        if (!form.title.trim()) return;
+    // ================== ADD MOVIE (API POST) ==================
+   const handleAdd = async () => {
+       if (!form.title.trim()) return;
 
-        const newFilm = {
-            movie_id: Date.now(),
-            ...form,
-            genre: form.genre.split(','),
-            actors: form.actors.split(','),
-            status: 'now_showing'
-        };
+       try {
+           const token = localStorage.getItem('token');
 
-        setFilms([newFilm, ...films]);
+           const payload = {
+               title: form.title,
+               director: form.director,
+               duration: Number(form.duration),
+               description: form.description,
+               release_date: form.release_date,
+               end_date: form.end_date,
+               age_limit: form.age_limit,
+               poster_url: form.poster_url,
+               trailer_url: form.trailer_url,
 
-        setForm({
-            title: '',
-            director: '',
-            actors: '',
-            duration: '',
-            genre: '',
-            age_limit: '',
-            release_date: '',
-            end_date: '',
-            description: '',
-            poster_url: '',
-            trailer_url: ''
-        });
+               actors: form.actors,
+               genre_ids: form.genre_ids,
+               backdrop_url: form.backdrop_url
+           };
 
-        setOpenModal(false);
-    };
+           const res = await fetch(
+               'https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies',
+               {
+                   method: 'POST',
+                   headers: {
+                       Authorization: `Bearer ${token}`,
+                       'Content-Type': 'application/json',
+                       Accept: 'application/json'
+                   },
+                   body: JSON.stringify(payload)
+               }
+           );
+
+           const json = await res.json();
+
+           if (!res.ok) {
+               alert(json.message || 'Thêm phim thất bại');
+               return;
+           }
+
+           fetchMovies();
+
+           setForm({
+               title: '',
+               director: '',
+               actors: '',
+               duration: '',
+               genre: '',
+               age_limit: '',
+               release_date: '',
+               end_date: '',
+               description: '',
+               poster_url: '',
+               backdrop_url: '',
+               trailer_url: ''
+           });
+
+           setSelectedGenres([]); // reset select
+           setOpenModal(false);
+       } catch (err) {
+           console.error(err);
+           alert('Lỗi server');
+       }
+   };
 
     const filtered = films.filter((f) =>
-        (f.title + f.director).toLowerCase().includes(search.toLowerCase())
+        (f.title + (f.director || '')).toLowerCase().includes(search.toLowerCase())
     );
 
     return (
@@ -147,9 +271,9 @@ const Films = () => {
 
                                 <td className="px-4 py-3">{item.director}</td>
 
-                                <td className="px-4 py-3">{item.actors.join(', ')}</td>
+                                <td className="px-4 py-3">{item.actors?.join(', ')}</td>
 
-                                <td className="px-4 py-3">{item.genre.join(', ')}</td>
+                                <td className="px-4 py-3">{item.genre?.join(', ')}</td>
 
                                 <td className="px-4 py-3">{item.duration}p</td>
 
@@ -159,6 +283,7 @@ const Films = () => {
 
                                 <td className="px-4 py-3">{item.end_date}</td>
 
+                                {/* STATUS */}
                                 <td className="px-4 py-3">
                                     <button
                                         onClick={() => toggleStatus(item.movie_id)}
@@ -192,7 +317,7 @@ const Films = () => {
                 </table>
             </div>
 
-            {/* MODAL */}
+            {/* MODAL giữ nguyên */}
             {openModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
                     {/* CONTAINER */}
@@ -228,12 +353,26 @@ const Films = () => {
                                     className="border p-2 rounded col-span-2"
                                 />
 
-                                <input
-                                    placeholder="Thể loại (cách nhau ,)"
-                                    value={form.genre}
-                                    onChange={(e) => setForm({ ...form, genre: e.target.value })}
-                                    className="border p-2 rounded"
-                                />
+                                <div>
+                                    <p className="font-medium mb-2">Thể loại</p>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {genres.map((g) => (
+                                            <button
+                                                key={g.genre_id}
+                                                type="button"
+                                                onClick={() => toggleGenre(g.genre_id)}
+                                                className={`px-3 py-1 rounded border ${
+                                                    form.genre_ids.includes(g.genre_id)
+                                                        ? 'bg-red-600 text-white'
+                                                        : ''
+                                                }`}
+                                            >
+                                                {g.genre_name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
 
                                 <input
                                     placeholder="Độ tuổi (C13, 16+)"
@@ -273,6 +412,14 @@ const Films = () => {
                                     value={form.poster_url}
                                     onChange={(e) =>
                                         setForm({ ...form, poster_url: e.target.value })
+                                    }
+                                    className="border p-2 rounded col-span-2"
+                                />
+                                <input
+                                    placeholder="Backdrop URL"
+                                    value={form.backdrop_url}
+                                    onChange={(e) =>
+                                        setForm({ ...form, backdrop_url: e.target.value })
                                     }
                                     className="border p-2 rounded col-span-2"
                                 />
@@ -317,6 +464,6 @@ const Films = () => {
             )}
         </div>
     );
-};
+};;
 
 export default Films;

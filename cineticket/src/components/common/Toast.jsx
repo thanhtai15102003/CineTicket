@@ -11,7 +11,7 @@ const Toast = ({ message, onClose }) => {
     }, [onClose]);
 
     return (
-        <div className="fixed top-6 right-6 bg-green-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-slide-in">
+        <div className="fixed top-6 right-6 bg-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50 animate-slide-in">
             <span className="text-2xl">🎉</span>
             <span className="font-medium pr-4">{message}</span>
             <button

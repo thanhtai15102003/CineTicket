@@ -5,7 +5,7 @@ const BookingProgress = () => {
 
     const getCurrentStep = () => {
         if (location.pathname.includes('/booking/')) return 2;
-        if (location.pathname.includes('/food/')) return 3;
+        if (location.pathname.includes('/combo/')) return 3;
         if (location.pathname.includes('/payment/')) return 4;
         if (location.pathname.includes('/confirmation/')) return 5;
         return 2;

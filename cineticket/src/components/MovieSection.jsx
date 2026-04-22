@@ -1,74 +1,114 @@
-// src/components/MovieSection.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import MovieCard from '../components/MovieCard';
-import { getNowShowingMovies, getUpcomingMovies } from '..//data/movie';
 
 const MovieSection = ({ showAll = false, onShowAll, isHome = false }) => {
     const [activeTab, setActiveTab] = useState('now_showing');
 
-    const allNowShowing = getNowShowingMovies();
-    const allUpcoming = getUpcomingMovies();
+    const [nowShowing, setNowShowing] = useState([]);
+    const [comingSoon, setComingSoon] = useState([]);
 
-    const displayedNowShowing = showAll ? allNowShowing : allNowShowing.slice(0, 4);
-    const displayedUpcoming = showAll ? allUpcoming : allUpcoming.slice(0, 4);
+    // ================= FETCH API =================
+    useEffect(() => {
+        const fetchMovies = async () => {
+            try {
+                const res = await fetch(
+                    'https://cinema-api-production-f2bc.up.railway.app/api/v1/movies'
+                );
+
+                const json = await res.json();
+
+                // ✅ SAFE DATA
+                const now = Array.isArray(json?.now_showing) ? json.now_showing : [];
+
+                const soon = Array.isArray(json?.coming_soon) ? json.coming_soon : [];
+
+                // ✅ FORMAT DATA CHO UI
+                const formatMovie = (m) => ({
+                    movie_id: m.movie_id,
+                    title: m.title || 'No title',
+                    duration: m.duration || 0,
+                    description: m.description || '',
+                    release_date: m.release_date || '',
+                    age_limit: m.age_limit || '',
+                    poster_url: m.poster_url || 'https://via.placeholder.com/300x450?text=No+Image',
+                    trailer_url: m.trailer_url || '#',
+
+                    // 👇 FIX ACTORS
+                    actors: m.actors
+                        ? typeof m.actors === 'string'
+                            ? m.actors.split(',')
+                            : m.actors
+                        : [],
+
+                    director: m.director || 'N/A',
+
+                    // 👇 FIX GENRE (QUAN TRỌNG)
+                    genres: Array.isArray(m.genres) ? m.genres.map((g) => g.genre_name) : []
+                });
+
+                setNowShowing(now.map(formatMovie));
+                setComingSoon(soon.map(formatMovie));
+            } catch (err) {
+                console.error('Lỗi fetch movies:', err);
+            }
+        };
+
+        fetchMovies();
+    }, []);
+
+    // ================= DISPLAY =================
+    const displayedNowShowing = showAll ? nowShowing : nowShowing.slice(0, 4);
+    const displayedUpcoming = showAll ? comingSoon : comingSoon.slice(0, 4);
 
     const filteredMovies = activeTab === 'now_showing' ? displayedNowShowing : displayedUpcoming;
 
     return (
         <section className="bg-zinc-950 py-14">
             <div className="max-w-7xl mx-auto px-6">
-                {/* Tiêu đề chỉ hiển thị ở trang chủ */}
                 {isHome && (
                     <div className="text-center mb-12">
                         <h2 className="text-3xl font-bold text-white mb-3">Phim nổi bật</h2>
                     </div>
                 )}
 
-                {/* Thanh Tab */}
+                {/* TAB */}
                 <div className="flex flex-col items-center mb-16">
                     <div className="inline-flex bg-zinc-900 p-1.5 rounded-2xl border border-zinc-800">
                         <button
                             onClick={() => setActiveTab('now_showing')}
-                            className={`px-8 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
+                            className={`px-8 py-3 rounded-xl ${
                                 activeTab === 'now_showing'
-                                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
-                                    : 'text-zinc-500 hover:text-white'
+                                    ? 'bg-red-600 text-white'
+                                    : 'text-zinc-500'
                             }`}
                         >
                             PHIM ĐANG CHIẾU
                         </button>
+
                         <button
                             onClick={() => setActiveTab('upcoming')}
-                            className={`px-8 py-3 rounded-xl text-sm font-bold transition-all duration-300 ${
-                                activeTab === 'upcoming'
-                                    ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
-                                    : 'text-zinc-500 hover:text-white'
+                            className={`px-8 py-3 rounded-xl ${
+                                activeTab === 'upcoming' ? 'bg-red-600 text-white' : 'text-zinc-500'
                             }`}
                         >
                             PHIM SẮP CHIẾU
                         </button>
                     </div>
-                    <div className="h-1 w-20 bg-red-600 mt-6 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.8)]"></div>
                 </div>
 
-                {/* Danh sách phim */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
+                {/* LIST */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
                     {filteredMovies.map((movie) => (
-                        <div
-                            key={movie.movie_id}
-                            className="animate-in fade-in slide-in-from-bottom-4 duration-700"
-                        >
-                            <MovieCard movie={movie} />
-                        </div>
+                        <MovieCard key={movie.movie_id} movie={movie} />
                     ))}
                 </div>
 
-                {/* Nút "Xem tất cả phim" - Chỉ hiển thị ở trang chủ và khi chưa showAll */}
+                {/* BUTTON */}
                 {isHome && !showAll && (
                     <div className="mt-12 text-center">
                         <button
                             onClick={onShowAll}
-                            className="px-10 py-3.5 border-2 border-zinc-800 text-zinc-400 font-bold rounded-full hover:bg-white hover:text-black hover:border-white transition-all duration-300"
+                            className="px-10 py-3 border text-zinc-400 rounded-full hover:bg-white hover:text-black"
                         >
                             XEM TẤT CẢ PHIM
                         </button>

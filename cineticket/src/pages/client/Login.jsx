@@ -4,61 +4,10 @@ import { useNavigate } from 'react-router-dom';
 const Login = () => {
     const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
-
-    // Giả lập Database Users (giống bảng users của bạn)
-    const [users, setUsers] = useState([
-        {
-            user_id: 1,
-            username: 'admin',
-            password_hash: '123456',
-            full_name: 'Thái Nguyễn Thành Tài',
-            email: 'tai@gmail.com',
-            phone: '0123456789',
-            gender: 'Nam',
-            date_of_birth: '2000-01-01',
-            role_id: 3,
-            cinema_id: null,
-            status: 'active',
-            created_at: '2026-04-01'
-        },
-        {
-            user_id: 2,
-            username: 'user1',
-            password_hash: '123456',
-            full_name: 'Nguyễn Đức Tài',
-            email: 'ductai@gmail.com',
-            phone: '0987654321',
-            gender: 'Nam',
-            date_of_birth: '1998-05-15',
-            role_id: 3,
-            cinema_id: null,
-            status: 'active',
-            created_at: '2026-04-01'
-        },
-        {
-            user_id: 3,
-            username: 'admin',
-            password_hash: '123456',
-            full_name: 'Super Admin',
-            email: 'admin@gmail.com',
-            role_id: 1,
-            role_name: 'super_admin',
-            status: 'active'
-        },
-        {
-            user_id: 4,
-            username: 'staff',
-            password_hash: '123456',
-            full_name: 'Quản trị viên',
-            email: 'staff@gmail.com',
-            role_id: 2,
-            role_name: 'admin',
-            status: 'active'
-        }
-    ]);
+    const [loading, setLoading] = useState(false);
 
     const [loginData, setLoginData] = useState({
-        email: '',
+        account: '',
         password: '',
         remember: false
     });
@@ -72,31 +21,49 @@ const Login = () => {
         gender: 'Nam'
     });
 
-    // Xử lý Login
-    const handleLoginSubmit = (e) => {
+    // ==================== XỬ LÝ ĐĂNG NHẬP (API) ====================
+    const handleLoginSubmit = async (e) => {
         e.preventDefault();
+        setLoading(true);
 
-        const user = users.find(
-            (u) =>
-                (u.email === loginData.email || u.username === loginData.email) &&
-                u.password_hash === loginData.password
-        );
+        try {
+            const response = await fetch(
+                'https://cinema-api-production-f2bc.up.railway.app/api/v1/login',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: loginData.account,
+                        username: loginData.account,
+                        password: loginData.password
+                    })
+                }
+            );
 
-        if (user) {
-            if (user.status !== 'active') {
-                alert('Tài khoản của bạn đã bị khóa!');
-                return;
+            const result = await response.json();
+
+            if (response.ok) {
+                // Lưu token và user vào localStorage
+                localStorage.setItem('token', result.token);
+                localStorage.setItem('currentUser', JSON.stringify(result.user));
+
+                alert(`Đăng nhập thành công! Chào mừng ${result.user.full_name}`);
+                navigate('/'); // hoặc trang dashboard tùy bạn
+            } else {
+                alert(result.message || 'Email hoặc mật khẩu không đúng!');
             }
-
-            alert(`Đăng nhập thành công! Chào mừng ${user.full_name}`);
-            localStorage.setItem('currentUser', JSON.stringify(user));
-            navigate('/');
-        } else {
-            alert('Email hoặc mật khẩu không đúng!');
+        } catch (error) {
+            console.error('Login error:', error);
+            alert('Có lỗi kết nối đến server. Vui lòng thử lại sau!');
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Xử lý Đăng ký - Giống bảng users
+    // ==================== XỬ LÝ ĐĂNG KÝ (Tạm giữ nguyên hoặc bạn có thể thêm API sau) ====================
     const handleRegisterSubmit = (e) => {
         e.preventDefault();
 
@@ -105,33 +72,8 @@ const Login = () => {
             return;
         }
 
-        // Kiểm tra email đã tồn tại
-        const emailExists = users.some((u) => u.email === registerData.email);
-        if (emailExists) {
-            alert('Email này đã được sử dụng!');
-            return;
-        }
-
-        // Tạo user mới giống cấu trúc bảng users
-        const newUser = {
-            user_id: Date.now(), // tạm dùng timestamp làm id
-            username: registerData.email.split('@')[0],
-            password_hash: registerData.password, // thực tế nên hash
-            full_name: registerData.full_name,
-            email: registerData.email,
-            phone: registerData.phone || null,
-            gender: registerData.gender,
-            date_of_birth: null, // có thể thêm sau
-            role_id: 2, // 2 = User thường
-            cinema_id: null,
-            status: 'active',
-            created_at: new Date().toISOString().split('T')[0]
-        };
-
-        setUsers([...users, newUser]);
-
-        alert('Đăng ký tài khoản thành công! Bạn có thể đăng nhập ngay bây giờ.');
-        setIsLogin(true); // Chuyển về tab Đăng nhập
+        alert('Đăng ký thành công! (Chức năng đăng ký API sẽ được thêm sau)');
+        setIsLogin(true);
         setRegisterData({
             full_name: '',
             email: '',
@@ -164,7 +106,7 @@ const Login = () => {
             <div className="absolute inset-0 bg-[url('/images/cinema-bg.jpg')] bg-cover bg-center opacity-10" />
 
             <div className="relative w-full max-w-5xl h-[650px] rounded-[40px] overflow-hidden border border-white/10 bg-white/5 backdrop-blur-2xl shadow-[0_0_60px_rgba(255,0,0,0.18)]">
-                {/* LOGIN FORM */}
+                {/* ==================== FORM ĐĂNG NHẬP ==================== */}
                 <div
                     className={`absolute top-0 h-full w-1/2 flex items-center justify-center px-12 transition-all duration-700 z-20 ${isLogin ? 'left-0 opacity-100' : 'left-0 opacity-0 pointer-events-none'}`}
                 >
@@ -177,14 +119,14 @@ const Login = () => {
                         <form onSubmit={handleLoginSubmit} className="space-y-5">
                             <div>
                                 <label className="block text-zinc-400 mb-2 text-sm">
-                                    Email hoặc số điện thoại
+                                    Email hoặc tên đăng nhập
                                 </label>
                                 <input
                                     type="text"
-                                    name="email"
-                                    value={loginData.email}
+                                    name="account"
+                                    value={loginData.account}
                                     onChange={handleLoginChange}
-                                    placeholder="Nhập email hoặc số điện thoại"
+                                    placeholder="Nhập email hoặc tên đăng nhập"
                                     className="w-full rounded-2xl bg-zinc-900/80 border border-zinc-700 px-5 py-4 text-white outline-none transition focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.4)]"
                                     required
                                 />
@@ -224,15 +166,16 @@ const Login = () => {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-2xl bg-red-600 py-4 text-lg font-semibold text-white transition duration-300 hover:scale-[1.02] hover:bg-red-700 hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] active:scale-95"
+                                disabled={loading}
+                                className="w-full rounded-2xl bg-red-600 py-4 text-lg font-semibold text-white transition duration-300 hover:scale-[1.02] hover:bg-red-700 hover:shadow-[0_0_30px_rgba(239,68,68,0.5)] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                             >
-                                Đăng nhập
+                                {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                             </button>
                         </form>
                     </div>
                 </div>
 
-                {/* REGISTER FORM - Đã chỉnh giống database */}
+                {/* ==================== FORM ĐĂNG KÝ (giữ nguyên) ==================== */}
                 <div
                     className={`absolute top-0 h-full w-1/2 flex items-center justify-center px-12 transition-all duration-700 z-20 ${!isLogin ? 'left-1/2 opacity-100' : 'left-1/2 opacity-0 pointer-events-none'}`}
                 >
@@ -317,7 +260,7 @@ const Login = () => {
                     </div>
                 </div>
 
-                {/* Sliding Panel giữ nguyên */}
+                {/* Sliding Panel */}
                 <div
                     className={`absolute top-0 h-full w-1/2 z-30 transition-all duration-700 ${isLogin ? 'left-1/2' : 'left-0'}`}
                 >

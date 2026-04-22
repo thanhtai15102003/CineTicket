@@ -12,14 +12,17 @@ const Booking = () => {
     const [showtime, setShowtime] = useState(null);
     const [movie, setMovie] = useState(null);
     const [selectedSeats, setSelectedSeats] = useState([]);
-    const [timeLeft, setTimeLeft] = useState(120);
-    const [timerActive, setTimerActive] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     useEffect(() => {
         const id = Number(showtimeId);
-        console.log('Đang tìm showtime_id:', id); // ← Dùng để debug
+
+        if (!showtimeId || isNaN(id)) {
+            setError(`showtimeId không hợp lệ: ${showtimeId}`);
+            setLoading(false);
+            return;
+        }
 
         const foundShowtime = showtimes.find((s) => s.showtime_id === id);
 
@@ -42,76 +45,23 @@ const Booking = () => {
         setLoading(false);
     }, [showtimeId]);
 
-    // Timer 2 phút
-    useEffect(() => {
-        const id = showtimeId ? Number(showtimeId) : NaN;
-        console.log('🔍 URL showtimeId nhận được:', showtimeId);
-        console.log('🔢 Sau khi convert thành số:', id);
-
-        if (!showtimeId || isNaN(id)) {
-            setError(`showtimeId không hợp lệ: ${showtimeId}`);
-            setLoading(false);
-            return;
-        }
-
-        const foundShowtime = showtimes.find((s) => s.showtime_id === id);
-
-        if (!foundShowtime) {
-            setError(`Không tìm thấy suất chiếu với ID: ${id}`);
-            setLoading(false);
-            return;
-        }
-
-        setShowtime(foundShowtime);
-
-        const foundMovie = movies.find((m) => m.movie_id === foundShowtime.movie_id);
-        if (foundMovie) {
-            setMovie(foundMovie);
-        } else {
-            setError('Không tìm thấy thông tin phim tương ứng');
-        }
-
-        setLoading(false);
-    }, [showtimeId]);
-
     const handleSeatSelect = (seat) => {
         if (selectedSeats.some((s) => s.id === seat.id)) {
             setSelectedSeats((prev) => prev.filter((s) => s.id !== seat.id));
-            return;
-        }
-
-        setSelectedSeats((prev) => [...prev, seat]);
-        if (!timerActive) {
-            setTimerActive(true);
+        } else {
+            setSelectedSeats((prev) => [...prev, seat]);
         }
     };
 
-    useEffect(() => {
-        if (!timerActive) return;
-        if (selectedSeats.length === 0) {
-            setTimerActive(false);
-            setTimeLeft(120);
-            return;
-        }
-
-        const intervalId = setInterval(() => {
-            setTimeLeft((prev) => {
-                if (prev <= 1) {
-                    clearInterval(intervalId);
-                    setTimerActive(false);
-                    setSelectedSeats([]);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => clearInterval(intervalId);
-    }, [timerActive, selectedSeats.length]);
+    // Khi bấm tiếp tục, lưu selectedSeats vào localStorage và chuyển sang combo
+    const handleContinue = () => {
+        localStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
+        localStorage.setItem('bookingMovie', JSON.stringify(movie));
+        localStorage.setItem('bookingShowtime', JSON.stringify(showtime));
+        navigate(`/combo/${showtimeId}`);
+    };
 
     const totalPrice = selectedSeats.reduce((sum, seat) => sum + seat.price, 0);
-
-    const formatTime = (sec) => `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`;
 
     if (loading) {
         return (
@@ -145,12 +95,9 @@ const Booking = () => {
 
     return (
         <div className="bg-zinc-950 min-h-screen text-white">
-            {/* Phần progress bar và nội dung chính giống ảnh Galaxy */}
-            {/* ... (mình sẽ bổ sung đầy đủ nếu bạn muốn) */}
-
             <div className="max-w-6xl mx-auto px-6 py-8">
-                {/* ==================== PROGRESS STEPS ==================== */}
                 <BookingProgress />
+
                 <h1 className="text-3xl font-bold mb-2">{movie.title}</h1>
                 <p className="text-zinc-400">
                     {showtime.cinema || 'Galaxy Nguyễn Du'} • {showtime.room} • {showtime.show_date}{' '}
@@ -159,15 +106,10 @@ const Booking = () => {
 
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
                     <div className="lg:col-span-8">
-                        <SeatMap
-                            selectedSeats={selectedSeats}
-                            onSeatSelect={handleSeatSelect}
-                            timer={timeLeft}
-                        />
+                        <SeatMap selectedSeats={selectedSeats} onSeatSelect={handleSeatSelect} />
                     </div>
 
                     <div className="lg:col-span-4">
-                        {/* Phần thông tin bên phải */}
                         <div className="bg-zinc-900 p-6 rounded-2xl sticky top-6">
                             <h3 className="text-lg font-semibold mb-4">Thông tin đặt vé</h3>
 
@@ -196,20 +138,28 @@ const Booking = () => {
                                 </div>
                             </div>
 
+                            {/* GHẾ */}
                             {selectedSeats.length > 0 && (
                                 <div className="mt-6">
-                                    <p className="text-zinc-400 mb-2">
+                                    <p className="text-zinc-400 mb-3">
                                         Ghế đã chọn ({selectedSeats.length})
                                     </p>
-                                    {selectedSeats.map((s, i) => (
-                                        <div key={i} className="flex justify-between text-sm py-1">
-                                            <span>{s.label}</span>
-                                            <span>{s.price.toLocaleString()}đ</span>
-                                        </div>
-                                    ))}
+
+                                    <div className="space-y-2">
+                                        {selectedSeats.map((s, i) => (
+                                            <div key={i}>
+                                                <div className="flex justify-between text-sm">
+                                                    <span>Ghế {s.label}</span>
+                                                    <span>{s.price.toLocaleString()}đ</span>
+                                                </div>
+
+                                                {/* line */}
+                                                <div className="border-b border-dashed border-zinc-700 mt-1"></div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
-
                             <div className="border-t border-zinc-700 my-6"></div>
 
                             <div className="flex justify-between text-xl font-bold">
@@ -218,12 +168,6 @@ const Booking = () => {
                                     {totalPrice.toLocaleString()}đ
                                 </span>
                             </div>
-
-                            {timerActive && (
-                                <p className="text-yellow-400 text-center mt-4">
-                                    Thời gian giữ ghế: <b>{formatTime(timeLeft)}</b>
-                                </p>
-                            )}
 
                             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                                 <button
@@ -236,6 +180,7 @@ const Booking = () => {
                                 <button
                                     disabled={selectedSeats.length === 0}
                                     className="flex-1 bg-orange-600 py-4 rounded-xl font-semibold text-lg disabled:bg-zinc-700"
+                                    onClick={handleContinue}
                                 >
                                     Tiếp tục
                                 </button>

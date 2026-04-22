@@ -5,6 +5,7 @@ import Movies from './pages/client/Movies';
 import MovieDetail from './pages/client/MovieDetail';
 import Booking from './pages/client/Booking';
 import Login from './pages/client/Login';
+import ComboPage from './pages/client/ComboPage';
 
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/admin/DashBoard';
@@ -57,6 +58,15 @@ function App() {
                     element={
                         <MainLayout>
                             <Booking />
+                        </MainLayout>
+                    }
+                />
+                {/* Trang chọn combo */}
+                <Route
+                    path="/combo/:showtimeId"
+                    element={
+                        <MainLayout>
+                            <ComboPage />
                         </MainLayout>
                     }
                 />
