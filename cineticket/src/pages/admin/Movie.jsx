@@ -1,12 +1,30 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import Pagination from '../../components/common/Pagination';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Toast from '../../components/common/Toast';
 
 const Films = () => {
     const [search, setSearch] = useState('');
     const [openModal, setOpenModal] = useState(false);
 
+    //sửa
+    const [isEdit, setIsEdit] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+
     const [genres, setGenres] = useState([]);
     const [selectedGenres, setSelectedGenres] = useState([]);
+
+    const [toast, setToast] = useState({ show: false, message: '' });
+    const showToast = (msg) => {
+        setToast({ show: true, message: msg });
+    };
+
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5; // số dòng mỗi trang
+
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const [form, setForm] = useState({
         title: '',
@@ -25,7 +43,6 @@ const Films = () => {
 
     const [films, setFilms] = useState([]);
 
-
     const toggleGenre = (id) => {
         setForm((prev) => ({
             ...prev,
@@ -38,6 +55,7 @@ const Films = () => {
     useEffect(() => {
         const fetchMovies = async () => {
             try {
+                setLoading(true);
                 const token = localStorage.getItem('token');
 
                 const res = await fetch(
@@ -91,6 +109,8 @@ const Films = () => {
             } catch (err) {
                 console.error('Lỗi fetch movies:', err);
                 setFilms([]);
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -123,6 +143,7 @@ const Films = () => {
             setGenres(data);
         } catch (err) {
             console.error('Lỗi genres:', err);
+            showToast('Lỗi tải thể loại ❌');
         }
     };
 
@@ -141,76 +162,102 @@ const Films = () => {
     };
 
     // ================== ADD MOVIE (API POST) ==================
-   const handleAdd = async () => {
-       if (!form.title.trim()) return;
+    const handleSubmit = async () => {
+        if (!form.title.trim()) {
+            showToast('Nhập tên phim ❗');
+            return;
+        }
 
-       try {
-           const token = localStorage.getItem('token');
+        try {
+            setSubmitting(true);
 
-           const payload = {
-               title: form.title,
-               director: form.director,
-               duration: Number(form.duration),
-               description: form.description,
-               release_date: form.release_date,
-               end_date: form.end_date,
-               age_limit: form.age_limit,
-               poster_url: form.poster_url,
-               trailer_url: form.trailer_url,
+            const token = localStorage.getItem('token');
 
-               actors: form.actors,
-               genre_ids: form.genre_ids,
-               backdrop_url: form.backdrop_url
-           };
+            const payload = {
+                title: form.title,
+                director: form.director,
+                duration: Number(form.duration),
+                description: form.description,
+                release_date: form.release_date,
+                end_date: form.end_date,
+                age_limit: form.age_limit,
+                poster_url: form.poster_url,
+                trailer_url: form.trailer_url,
+                actors: form.actors,
+                genre_ids: form.genre_ids,
+                backdrop_url: form.backdrop_url
+            };
 
-           const res = await fetch(
-               'https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies',
-               {
-                   method: 'POST',
-                   headers: {
-                       Authorization: `Bearer ${token}`,
-                       'Content-Type': 'application/json',
-                       Accept: 'application/json'
-                   },
-                   body: JSON.stringify(payload)
-               }
-           );
+            const url = isEdit
+                ? `https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies/${editingId}`
+                : `https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies`;
 
-           const json = await res.json();
+            const method = isEdit ? 'PUT' : 'POST';
 
-           if (!res.ok) {
-               alert(json.message || 'Thêm phim thất bại');
-               return;
-           }
+            const res = await fetch(url, {
+                method,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
 
-           fetchMovies();
+            const json = await res.json();
 
-           setForm({
-               title: '',
-               director: '',
-               actors: '',
-               duration: '',
-               genre: '',
-               age_limit: '',
-               release_date: '',
-               end_date: '',
-               description: '',
-               poster_url: '',
-               backdrop_url: '',
-               trailer_url: ''
-           });
+            if (!res.ok) {
+                showToast(json.message || 'Thêm phim thất bại ❌');
+                return;
+            }
 
-           setSelectedGenres([]); // reset select
-           setOpenModal(false);
-       } catch (err) {
-           console.error(err);
-           alert('Lỗi server');
-       }
-   };
+            showToast('Thêm phim thành công 🎉');
+
+            // reload list
+            window.location.reload();
+
+            setOpenModal(false);
+            setIsEdit(false);
+            setEditingId(null);
+        } catch (err) {
+            console.error('Lỗi fetch movies:', err);
+            setFilms([]);
+            showToast('Lỗi tải phim ❌');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    //hadle edit
+    const handleEdit = (item) => {
+        setForm({
+            title: item.title,
+            director: item.director,
+            actors: item.actors?.join(', '),
+            duration: item.duration,
+            genre_ids: [], // nếu cần map lại genre_id thì làm thêm
+            age_limit: item.age_limit,
+            release_date: item.release_date,
+            end_date: item.end_date,
+            description: item.description,
+            poster_url: item.poster_url,
+            backdrop_url: item.backdrop_url || '',
+            trailer_url: item.trailer_url
+        });
+
+        setEditingId(item.movie_id);
+        setIsEdit(true);
+        setOpenModal(true);
+    };
 
     const filtered = films.filter((f) =>
         (f.title + (f.director || '')).toLowerCase().includes(search.toLowerCase())
     );
+
+    // ===== PAGINATION =====
+    const totalPages = Math.ceil(filtered.length / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
 
     return (
         <div className="space-y-6">
@@ -238,84 +285,100 @@ const Films = () => {
             </div>
 
             {/* TABLE */}
-            <div className="bg-white rounded-xl border overflow-auto">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3">Poster</th>
-                            <th className="px-4 py-3 text-left">Tên</th>
-                            <th className="px-4 py-3">Đạo diễn</th>
-                            <th className="px-4 py-3">Diễn viên</th>
-                            <th className="px-4 py-3">Thể loại</th>
-                            <th className="px-4 py-3">Thời lượng</th>
-                            <th className="px-4 py-3">Độ tuổi</th>
-                            <th className="px-4 py-3">Ngày chiếu</th>
-                            <th className="px-4 py-3">Kết thúc</th>
-                            <th className="px-4 py-3">Hoạt động</th>
-                            <th className="px-4 py-3">Trailer</th>
-                            <th className="px-4 py-3">Action</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {filtered.map((item) => (
-                            <tr key={item.movie_id} className="border-t">
-                                <td className="px-4 py-3">
-                                    <img
-                                        src={item.poster_url}
-                                        className="w-12 h-16 object-cover rounded"
-                                    />
-                                </td>
-
-                                <td className="px-4 py-3 font-medium">{item.title}</td>
-
-                                <td className="px-4 py-3">{item.director}</td>
-
-                                <td className="px-4 py-3">{item.actors?.join(', ')}</td>
-
-                                <td className="px-4 py-3">{item.genre?.join(', ')}</td>
-
-                                <td className="px-4 py-3">{item.duration}p</td>
-
-                                <td className="px-4 py-3">{item.age_limit}</td>
-
-                                <td className="px-4 py-3">{item.release_date}</td>
-
-                                <td className="px-4 py-3">{item.end_date}</td>
-
-                                {/* STATUS */}
-                                <td className="px-4 py-3">
-                                    <button
-                                        onClick={() => toggleStatus(item.movie_id)}
-                                        className={`px-2 py-1 rounded text-xs ${
-                                            item.status === 'now_showing'
-                                                ? 'bg-green-100 text-green-600'
-                                                : 'bg-gray-200'
-                                        }`}
-                                    >
-                                        {item.status === 'now_showing' ? 'Đang chiếu' : 'Ngừng'}
-                                    </button>
-                                </td>
-
-                                <td className="px-4 py-3">
-                                    <a
-                                        href={item.trailer_url}
-                                        target="_blank"
-                                        className="text-red-500"
-                                    >
-                                        Xem
-                                    </a>
-                                </td>
-
-                                <td className="px-4 py-3 flex gap-2">
-                                    <Pencil size={16} className="text-blue-500 cursor-pointer" />
-                                    <Trash2 size={16} className="text-red-500 cursor-pointer" />
-                                </td>
+            {loading ? (
+                <LoadingSpinner />
+            ) : (
+                <div className="bg-white rounded-xl border overflow-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-3">Poster</th>
+                                <th className="px-4 py-3 text-left">Tên</th>
+                                <th className="px-4 py-3">Đạo diễn</th>
+                                <th className="px-4 py-3">Diễn viên</th>
+                                <th className="px-4 py-3">Thể loại</th>
+                                <th className="px-4 py-3">Thời lượng</th>
+                                <th className="px-4 py-3">Độ tuổi</th>
+                                <th className="px-4 py-3">Ngày chiếu</th>
+                                <th className="px-4 py-3">Kết thúc</th>
+                                <th className="px-4 py-3">Hoạt động</th>
+                                <th className="px-4 py-3">Trailer</th>
+                                <th className="px-4 py-3">Action</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+
+                        <tbody>
+                            {paginatedData.map((item) => (
+                                <tr key={item.movie_id} className="border-t">
+                                    <td className="px-4 py-3">
+                                        <img
+                                            src={item.poster_url}
+                                            className="w-12 h-16 object-cover rounded"
+                                        />
+                                    </td>
+
+                                    <td className="px-4 py-3 font-medium">{item.title}</td>
+
+                                    <td className="px-4 py-3">{item.director}</td>
+
+                                    <td className="px-4 py-3">{item.actors?.join(', ')}</td>
+
+                                    <td className="px-4 py-3">{item.genre?.join(', ')}</td>
+
+                                    <td className="px-4 py-3">{item.duration}p</td>
+
+                                    <td className="px-4 py-3">{item.age_limit}</td>
+
+                                    <td className="px-4 py-3">{item.release_date}</td>
+
+                                    <td className="px-4 py-3">{item.end_date}</td>
+
+                                    {/* STATUS */}
+                                    <td className="px-4 py-3">
+                                        <button
+                                            onClick={() => toggleStatus(item.movie_id)}
+                                            className={`px-2 py-1 rounded text-xs ${
+                                                item.status === 'now_showing'
+                                                    ? 'bg-green-100 text-green-600'
+                                                    : 'bg-gray-200'
+                                            }`}
+                                        >
+                                            {item.status === 'now_showing' ? 'Đang chiếu' : 'Ngừng'}
+                                        </button>
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                        <a
+                                            href={item.trailer_url}
+                                            target="_blank"
+                                            className="text-red-500"
+                                        >
+                                            Xem
+                                        </a>
+                                    </td>
+
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex justify-center gap-2">
+                                            <Pencil
+                                                size={16}
+                                                className="text-blue-500 cursor-pointer"
+                                                onClick={() => handleEdit(item)}
+                                            />
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {!loading && totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={(page) => setCurrentPage(page)}
+                        />
+                    )}
+                </div>
+            )}
 
             {/* MODAL giữ nguyên */}
             {openModal && (
@@ -446,17 +509,22 @@ const Films = () => {
                         {/* FOOTER */}
                         <div className="flex justify-end gap-2 px-6 py-4 border-t">
                             <button
-                                onClick={() => setOpenModal(false)}
+                                onClick={() => {
+                                    setOpenModal(false);
+                                    setIsEdit(false);
+                                    setEditingId(null);
+                                }}
                                 className="px-4 py-2 border rounded"
                             >
                                 Huỷ
                             </button>
 
                             <button
-                                onClick={handleAdd}
-                                className="px-4 py-2 bg-red-600 text-white rounded"
+                                onClick={handleSubmit}
+                                disabled={submitting}
+                                className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50"
                             >
-                                Thêm
+                                {submitting ? 'Đang xử lý...' : isEdit ? 'Cập nhật' : 'Thêm'}
                             </button>
                         </div>
                     </div>
@@ -464,6 +532,6 @@ const Films = () => {
             )}
         </div>
     );
-};;
+};
 
 export default Films;

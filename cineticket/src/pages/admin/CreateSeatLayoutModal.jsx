@@ -1,150 +1,125 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const matrixOptions = [
-    { value: '12x12', rows: 12, cols: 12 },
-    { value: '13x13', rows: 13, cols: 13 }
-];
+export default function CreateSeatLayoutModal({ onClose }) {
+    const navigate = useNavigate();
 
-export default function CreateSeatLayoutModal({ onClose, onCreate }) {
     const [name, setName] = useState('');
-    const [matrix, setMatrix] = useState(matrixOptions[0]);
     const [description, setDescription] = useState('');
-      const navigate = useNavigate();
 
-    // 👉 user nhập số hàng
-    const [regularRows, setRegularRows] = useState(4);
-    const [vipRows, setVipRows] = useState(6);
-    const [doubleRows, setDoubleRows] = useState(2);
+    // 👉 Mặc định 8x13 nhưng cho phép nhập tay
+    const [rows, setRows] = useState(8);
+    const [cols, setCols] = useState(13);
 
-    const totalSeats = matrix.rows * matrix.cols;
+    const totalSeats = rows * cols;
 
-    // 👉 validate tổng hàng
-    const isValid = regularRows + vipRows + doubleRows === matrix.rows;
-
-    // 👉 generate seats
-    const generateSeats = () => {
-        const data = [];
-        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-        for (let r = 0; r < matrix.rows; r++) {
-            for (let c = 1; c <= matrix.cols; c++) {
-                let type = 'regular';
-
-                if (r < regularRows) {
-                    type = 'regular';
-                } else if (r < regularRows + vipRows) {
-                    type = 'vip';
-                } else {
-                    type = 'double';
-                }
-
-                data.push({
-                    seat_id: `${letters[r]}${c}`,
-                    row_label: letters[r],
-                    seat_number: c,
-                    seat_type: type
-                });
-            }
+    const handleNextStep = () => {
+        // 1. Kiểm tra tính hợp lệ (Validation) theo tiêu chuẩn API
+        if (!name.trim()) {
+            alert('Vui lòng nhập tên sơ đồ ghế');
+            return;
         }
 
-        return data;
-    };
+        if (rows <= 0 || rows > 26) {
+            alert('Số hàng phải từ 1 đến 26 (A-Z)');
+            return;
+        }
 
-    const handleCreate = () => {
-        if (!name) return alert('Nhập tên sơ đồ');
-        if (!isValid) return alert('Tổng số hàng không hợp lệ!');
+        if (cols <= 0 || cols > 50) {
+            alert('Số cột không nên quá lớn (tối đa 50) để hiển thị tốt nhất');
+            return;
+        }
 
-        const newLayout = {
-            id: Date.now().toString(),
-            name,
-            description,
-            status: 'draft',
-            active: false,
-            seats: generateSeats()
-        };
+        // 2. Chuyển sang Editor và mang theo "Gói dữ liệu" chuẩn
+        // Gói này sau này sẽ được bốc ra để gửi lên API POST
+        navigate('/admin/seat-layout/create', {
+            state: {
+                name: name.trim(),
+                description: description.trim(),
+                rows: Number(rows),
+                cols: Number(cols)
+            }
+        });
 
-        onCreate(newLayout);
-        navigate(`/admin/seat-layout/${newLayout.id}/edit`);
         onClose();
     };
 
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-            <div className="bg-white w-[520px] p-6 rounded-2xl">
-                <h2 className="text-lg font-bold mb-4">Tạo sơ đồ ghế</h2>
-
-                {/* NAME */}
-                <div className="mb-3">
-                    <label className="text-sm text-gray-500">Tên sơ đồ</label>
-                    <input
-                        className="w-full border p-2 rounded mt-1"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                    />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white w-[450px] p-6 rounded-3xl shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold">Thông tin sơ đồ</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-black">
+                        ✕
+                    </button>
                 </div>
 
-                {/* MATRIX */}
-                <div className="mb-3">
-                    <label className="text-sm text-gray-500">Ma trận ghế</label>
-                    <select
-                        className="w-full border p-2 rounded mt-1"
-                        value={matrix.value}
-                        onChange={(e) =>
-                            setMatrix(matrixOptions.find((m) => m.value === e.target.value))
-                        }
-                    >
-                        {matrixOptions.map((m) => (
-                            <option key={m.value} value={m.value}>
-                                {m.value}
-                            </option>
-                        ))}
-                    </select>
+                <div className="space-y-4">
+                    {/* TÊN SƠ ĐỒ */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase ml-1">
+                            Tên sơ đồ ghế
+                        </label>
+                        <input
+                            placeholder="Ví dụ: Rạp 01 - IMAX"
+                            className="w-full border-2 border-gray-100 p-3 rounded-xl mt-1 focus:border-red-500 outline-none transition-all"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
 
-                    <div className="text-sm text-gray-400 mt-1">
-                        {matrix.value} = {totalSeats} ghế
+                    {/* DÒNG & CỘT */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <InputNumber
+                            label="Số hàng (Dọc)"
+                            value={rows}
+                            onChange={setRows}
+                            max={26}
+                        />
+                        <InputNumber
+                            label="Số cột (Ngang)"
+                            value={cols}
+                            onChange={setCols}
+                            max={50}
+                        />
+                    </div>
+
+                    {/* MÔ TẢ */}
+                    <div>
+                        <label className="text-xs font-semibold text-gray-400 uppercase ml-1">
+                            Mô tả ngắn
+                        </label>
+                        <textarea
+                            placeholder="Mô tả về phòng chiếu hoặc loại sơ đồ này..."
+                            className="w-full border-2 border-gray-100 p-3 rounded-xl mt-1 focus:border-red-500 outline-none transition-all"
+                            rows={3}
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                        />
                     </div>
                 </div>
 
-                {/* ROW CONFIG */}
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                    <InputNumber label="Thường" value={regularRows} onChange={setRegularRows} />
-
-                    <InputNumber label="VIP" value={vipRows} onChange={setVipRows} />
-
-                    <InputNumber label="Ghế đôi" value={doubleRows} onChange={setDoubleRows} />
+                {/* THÔNG TIN TỔNG QUAN */}
+                <div className="mt-6 p-4 bg-gray-50 rounded-2xl flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Quy mô dự kiến:</span>
+                    <span className="font-bold text-red-600">
+                        {rows} hàng x {cols} cột = {totalSeats} ghế
+                    </span>
                 </div>
 
-                {/* VALIDATE */}
-                {!isValid && (
-                    <div className="text-red-500 text-sm mb-2">Tổng hàng phải = {matrix.rows}</div>
-                )}
-
-                {/* DESCRIPTION */}
-                <div className="mb-4">
-                    <label className="text-sm text-gray-500">Mô tả</label>
-                    <textarea
-                        className="w-full border p-2 rounded mt-1"
-                        rows={3}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                    />
-                </div>
-
-                {/* ACTION */}
-                <div className="flex justify-end gap-2">
-                    <button onClick={onClose} className="px-4 py-2 border rounded">
+                {/* NÚT TIẾP TỤC */}
+                <div className="mt-8 flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-3 border-2 border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all"
+                    >
                         Hủy
                     </button>
-
                     <button
-                        disabled={!isValid}
-                        onClick={handleCreate}
-                        className={`px-4 py-2 rounded text-white ${
-                            isValid ? 'bg-red-600' : 'bg-gray-400'
-                        }`}
+                        onClick={handleNextStep}
+                        className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 shadow-lg shadow-red-200 transition-all"
                     >
-                        Tạo
+                        Tiếp theo
                     </button>
                 </div>
             </div>
@@ -152,16 +127,16 @@ export default function CreateSeatLayoutModal({ onClose, onCreate }) {
     );
 }
 
-/* INPUT NUMBER */
-const InputNumber = ({ label, value, onChange }) => (
+const InputNumber = ({ label, value, onChange, max }) => (
     <div>
-        <label className="text-xs text-gray-500">{label}</label>
+        <label className="text-xs font-semibold text-gray-400 uppercase ml-1">{label}</label>
         <input
             type="number"
-            min="0"
-            className="w-full border p-2 rounded mt-1"
+            min="1"
+            max={max}
+            className="w-full border-2 border-gray-100 p-3 rounded-xl mt-1 outline-none focus:border-red-500"
             value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
+            onChange={(e) => onChange(e.target.value)}
         />
     </div>
 );

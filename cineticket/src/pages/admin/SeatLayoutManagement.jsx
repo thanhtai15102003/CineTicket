@@ -1,85 +1,130 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import CreateSeatLayoutModal from './CreateSeatLayoutModal';
 
-/* ================= MOCK DATA ================= */
-
-const generateSeats = (rows, cols, type) => {
-    const data = [];
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-    for (let r = 0; r < rows; r++) {
-        for (let c = 1; c <= cols; c++) {
-            data.push({
-                seat_id: `${letters[r]}${c}`,
-                row_label: letters[r],
-                seat_number: c,
-                seat_type: type
-            });
-        }
-    }
-
-    return data;
-};
-
-
-const initialLayouts = [
-    {
-        id: 'sl1',
-        name: 'Mẫu sơ đồ ghế vừa',
-        description: 'Mẫu sơ đồ ghế vừa',
-        status: 'published',
-        active: true,
-        seats: generateSeats(12, 12, 'regular')
-    },
-    {
-        id: 'sl2',
-        name: 'Mẫu sơ đồ ghế trung bình',
-        description: 'Mẫu sơ đồ ghế trung bình',
-        status: 'draft',
-        active: false,
-        seats: generateSeats(13, 13, 'vip')
-    }
-];
-
-/* ================= COMPONENT ================= */
-
 const tabs = [
     { key: 'all', label: 'Tất cả' },
-    { key: 'published', label: 'Đã xuất bản' },
-    { key: 'draft', label: 'Bản nháp' }
+    { key: 'active', label: 'Đang hoạt động' },
+    { key: 'inactive', label: 'Ngừng' }
 ];
 
 export default function SeatLayoutManagement() {
-    const [layouts, setLayouts] = useState(initialLayouts);
+    const [layouts, setLayouts] = useState([]);
     const [activeTab, setActiveTab] = useState('all');
     const [search, setSearch] = useState('');
-    const navigate = useNavigate();
+    const [loading, setLoading] = useState(false);
 
+    const navigate = useNavigate();
     const [showModal, setShowModal] = useState(false);
 
+    /* ================= FETCH ================= */
+    useEffect(() => {
+        fetchLayouts();
+    }, []);
+
+    const fetchLayouts = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+
+            const res = await fetch(
+                'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts',
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json'
+                    }
+                }
+            );
+
+            const json = await res.json();
+
+            if (!res.ok) {
+                console.error(json);
+                return;
+            }
+
+            setLayouts(Array.isArray(json?.data) ? json.data : []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    /* ================= FILTER ================= */
     const filteredLayouts = layouts.filter((l) => {
         const matchTab = activeTab === 'all' || l.status === activeTab;
         const matchSearch = l.name.toLowerCase().includes(search.toLowerCase());
         return matchTab && matchSearch;
     });
 
-    const handleDelete = (id) => {
-        if (window.confirm('Xóa sơ đồ này?')) {
-            setLayouts((prev) => prev.filter((l) => l.id !== id));
+    /* ================= DELETE ================= */
+    const handleDelete = async (id) => {
+        if (!window.confirm('Xóa sơ đồ này?')) return;
+
+        try {
+            const token = localStorage.getItem('token');
+
+            await fetch(
+                `https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts/${id}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            setLayouts((prev) => prev.filter((l) => l.layout_id !== id));
+        } catch (err) {
+            console.error(err);
         }
     };
 
-    const toggleActive = (id) => {
-        setLayouts((prev) => prev.map((l) => (l.id === id ? { ...l, active: !l.active } : l)));
+    /* ================= TOGGLE STATUS (PUT) ================= */
+    const toggleStatus = async (layout) => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const newStatus = layout.status === 'active' ? 'inactive' : 'active';
+
+            const res = await fetch(
+                `https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts/${layout.layout_id}`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: layout.name,
+                        description: layout.description || '',
+                        status: newStatus
+                    })
+                }
+            );
+
+            const json = await res.json();
+
+            if (!res.ok) {
+                console.error(json);
+                return;
+            }
+
+            // update UI
+            setLayouts((prev) =>
+                prev.map((l) =>
+                    l.layout_id === layout.layout_id ? { ...l, status: newStatus } : l
+                )
+            );
+        } catch (err) {
+            console.error('Toggle lỗi:', err);
+        }
     };
 
-    // 👉 Tạo sơ đồ mới
-    // const handleCreate = () => {
-    //     navigate('/admin/seat-layout/create');
-    // };
-
+    /* ================= UI ================= */
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
             {/* HEADER */}
@@ -123,7 +168,7 @@ export default function SeatLayoutManagement() {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-100 text-left">
                         <tr>
-                            <th className="p-3">Tên mẫu</th>
+                            <th className="p-3">Tên</th>
                             <th className="p-3">Mô tả</th>
                             <th className="p-3">Ma trận</th>
                             <th className="p-3">Trạng thái</th>
@@ -133,96 +178,110 @@ export default function SeatLayoutManagement() {
                     </thead>
 
                     <tbody>
-                        {filteredLayouts.map((layout) => (
-                            <tr key={layout.id} className="border-t">
-                                {/* NAME + VIEW */}
-                                <td className="p-3">
-                                    <div className="font-medium">{layout.name}</div>
-                                    <button
-                                        onClick={() => navigate(`/admin/seat-layout/${layout.id}`)}
-                                        className="text-xs text-blue-500 hover:underline mt-1"
-                                    >
-                                        Xem sơ đồ ghế
-                                    </button>
-                                </td>
-
-                                {/* DESC */}
-                                <td className="p-3 text-gray-500">{layout.description}</td>
-
-                                {/* MATRIX SIZE */}
-                                <td className="p-3 font-semibold text-gray-700">
-                                    {getMatrixSize(layout.seats)}
-                                </td>
-
-                                {/* STATUS */}
-                                <td className="p-3">
-                                    <span
-                                        className={`px-3 py-1 rounded-full text-xs ${
-                                            layout.status === 'published'
-                                                ? 'bg-green-100 text-green-600'
-                                                : 'bg-yellow-100 text-yellow-600'
-                                        }`}
-                                    >
-                                        {layout.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'}
-                                    </span>
-                                </td>
-
-                                {/* ACTIVE */}
-                                <td className="p-3">
-                                    <button
-                                        onClick={() => toggleActive(layout.id)}
-                                        className={`w-10 h-5 flex items-center rounded-full p-1 ${
-                                            layout.active ? 'bg-green-500' : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`w-4 h-4 bg-white rounded-full ${
-                                                layout.active ? 'translate-x-5' : ''
-                                            }`}
-                                        />
-                                    </button>
-                                </td>
-
-                                {/* ACTION */}
-                                <td className="p-3 flex justify-center gap-3">
-                                    <Pencil
-                                        onClick={() =>
-                                            navigate(`/admin/seat-layout/${layout.id}/edit`)
-                                        }
-                                        size={16}
-                                        className="cursor-pointer"
-                                    />
-                                    <Trash2
-                                        size={16}
-                                        className="cursor-pointer text-red-500"
-                                        onClick={() => handleDelete(layout.id)}
-                                    />
+                        {loading ? (
+                            <tr>
+                                <td colSpan="6" className="text-center p-6">
+                                    Loading...
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            filteredLayouts.map((layout) => (
+                                <tr key={layout.layout_id} className="border-t">
+                                    {/* NAME */}
+                                    <td className="p-3">
+                                        <div className="font-medium">{layout.name}</div>
+                                        <button
+                                            onClick={() =>
+                                                navigate(`/admin/seat-layout/${layout.layout_id}`)
+                                            }
+                                            className="text-xs text-blue-500 hover:underline"
+                                        >
+                                            Xem sơ đồ ghế
+                                        </button>
+                                    </td>
+
+                                    {/* DESCRIPTION */}
+                                    <td className="p-3 text-gray-500">
+                                        {layout.description || '—'}
+                                    </td>
+
+                                    {/* MATRIX */}
+                                    <td className="p-3 font-semibold">
+                                        {layout.row_count} x {layout.column_count}
+                                    </td>
+
+                                    {/* STATUS */}
+                                    <td className="p-3">
+                                        <span
+                                            className={`px-3 py-1 rounded-full text-xs ${
+                                                layout.status === 'active'
+                                                    ? 'bg-green-100 text-green-600'
+                                                    : 'bg-gray-200'
+                                            }`}
+                                        >
+                                            {layout.status === 'active' ? 'Hoạt động' : 'Ngừng'}
+                                        </span>
+                                    </td>
+
+                                    {/* TOGGLE */}
+                                    <td className="p-3">
+                                        <button
+                                            onClick={() => toggleStatus(layout)}
+                                            className={`w-10 h-5 flex items-center rounded-full p-1 ${
+                                                layout.status === 'active'
+                                                    ? 'bg-green-500'
+                                                    : 'bg-gray-300'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-4 h-4 bg-white rounded-full transition ${
+                                                    layout.status === 'active'
+                                                        ? 'translate-x-5'
+                                                        : ''
+                                                }`}
+                                            />
+                                        </button>
+                                    </td>
+
+                                    {/* ACTION */}
+                                    <td className="p-3 flex justify-center gap-3">
+                                        <Pencil
+                                            size={16}
+                                            className="cursor-pointer"
+                                            onClick={() =>
+                                                navigate(
+                                                    `/admin/seat-layout/${layout.layout_id}/edit`
+                                                )
+                                            }
+                                        />
+
+                                        <Trash2
+                                            size={16}
+                                            className="cursor-pointer text-red-500"
+                                            onClick={() => handleDelete(layout.layout_id)}
+                                        />
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
 
-                {filteredLayouts.length === 0 && (
+                {!loading && filteredLayouts.length === 0 && (
                     <div className="p-6 text-center text-gray-400">Không có dữ liệu</div>
                 )}
             </div>
+
             {/* MODAL */}
             {showModal && (
                 <CreateSeatLayoutModal
                     onClose={() => setShowModal(false)}
-                    onCreate={(layout) => setLayouts((prev) => [layout, ...prev])}
+                    onCreate={() => {
+                        setShowModal(false);
+                        fetchLayouts();
+                    }}
                 />
             )}
         </div>
     );
 }
-
-/* ================= HELPER ================= */
-
-// 👉 tính ma trận (12x12)
-const getMatrixSize = (seats) => {
-    const rows = new Set(seats.map((s) => s.row_label)).size;
-    const cols = Math.max(...seats.map((s) => s.seat_number));
-    return `${rows} x ${cols}`;
-};

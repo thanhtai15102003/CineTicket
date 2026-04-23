@@ -161,6 +161,15 @@ function App() {
                     }
                 />
 
+                <Route
+                    path="/admin/seat-layout/create"
+                    element={
+                        <AdminLayout>
+                            <SeatLayoutEditor />
+                        </AdminLayout>
+                    }
+                />
+
                 {/* Trang quản lý suất chiếu */}
                 <Route
                     path="/admin/showtimes"

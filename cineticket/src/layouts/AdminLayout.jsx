@@ -167,7 +167,7 @@ const AdminLayout = ({ children }) => {
 
             {/* ===== MAIN ===== */}
             <main className="flex-1 h-screen overflow-y-auto">
-                <header className="h-16 bg-white border-b flex items-center justify-between px-8 sticky top-0">
+                <header className="h-16 bg-white border-b flex items-center justify-between px-8 sticky top-0 z-10">
                     <h1 className="font-semibold text-xl">{getPageTitle(location.pathname)}</h1>
 
                     <div className="flex items-center gap-4">
