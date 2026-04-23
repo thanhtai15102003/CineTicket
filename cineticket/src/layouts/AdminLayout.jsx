@@ -38,16 +38,46 @@ const AdminLayout = ({ children }) => {
     };
 
     useEffect(() => {
-        const user = localStorage.getItem('currentUser');
-        if (user) setCurrentUser(JSON.parse(user));
-        else navigate('/login');
+        const fetchCurrentUser = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                navigate('/login');
+                return;
+            }
+
+            try {
+                const res = await fetch(
+                    'https://cinema-api-production-f2bc.up.railway.app/api/v1/users/me',
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            Accept: 'application/json'
+                        }
+                    }
+                );
+
+                if (!res.ok) {
+                    navigate('/login');
+                    return;
+                }
+
+                const json = await res.json();
+                setCurrentUser(json);
+                localStorage.setItem('currentUser', JSON.stringify(json));
+            } catch (err) {
+                navigate('/login');
+            }
+        };
+
+        fetchCurrentUser();
     }, [navigate]);
 
     const getRequiredPermission = (pathname) => {
         if (pathname === '/dashboard') return null;
         if (pathname.startsWith('/admin/users')) return 'manage_users';
         if (pathname.startsWith('/admin/movies')) return 'manage_movies';
-        if (pathname.startsWith('/admin/areas') || pathname.startsWith('/admin/cinemas')) return 'manage_cinemas';
+        if (pathname.startsWith('/admin/areas') || pathname.startsWith('/admin/cinemas'))
+            return 'manage_cinemas';
         return null;
     };
 
@@ -62,6 +92,7 @@ const AdminLayout = ({ children }) => {
 
     const handleLogout = () => {
         localStorage.removeItem('currentUser');
+        localStorage.removeItem('token');
         navigate('/login');
     };
 
@@ -75,7 +106,6 @@ const AdminLayout = ({ children }) => {
                 <div className="w-11 h-11 bg-red-600 rounded-2xl flex items-center justify-center text-white font-bold">
                     🎬
                 </div>
-                {/* ===== Admin Tổng ===== */}
                 {/* Dashboard */}
                 <NavItem
                     to="/dashboard"
@@ -84,7 +114,7 @@ const AdminLayout = ({ children }) => {
                     pathname={location.pathname}
                     exact
                 />
-                {/* ===== GROUP RẠP ===== */}
+                {/* GROUP RẠP */}
                 {hasPermission(currentUser, 'manage_cinemas') && (
                     <NavGroup pathname={location.pathname}>
                         {({ open, setOpen }) => (
@@ -96,7 +126,6 @@ const AdminLayout = ({ children }) => {
                                 pathname={location.pathname}
                             />
                         )}
-
                         <NavGroupContent>
                             <NavItem
                                 to="/admin/areas"
@@ -116,7 +145,6 @@ const AdminLayout = ({ children }) => {
                     </NavGroup>
                 )}
 
-                {/* quản lí phim */}
                 {hasPermission(currentUser, 'manage_movies') && (
                     <NavItem
                         to="/admin/movies"
@@ -125,7 +153,6 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
-                {/* Users */}
                 {hasPermission(currentUser, 'manage_users') && (
                     <NavItem
                         to="/admin/users"
@@ -134,9 +161,6 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
-
-                {/* ===== Admin Chi Nhánh ===== */}
-                {/* Quản lý phòng */}
                 {hasPermission(currentUser, 'manage_rooms') && (
                     <NavItem
                         to="/admin/rooms"
@@ -145,7 +169,6 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
-                {/* Quản lý sơ đồ ghế */}
                 {hasPermission(currentUser, 'manage_seat_layouts') && (
                     <NavItem
                         to="/admin/seat-layout"
@@ -154,7 +177,6 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
-                {/* Quản lý suất chiếu */}
                 {hasPermission(currentUser, 'manage_showtimes') && (
                     <NavItem
                         to="/admin/showtimes"
@@ -168,12 +190,26 @@ const AdminLayout = ({ children }) => {
             {/* ===== MAIN ===== */}
             <main className="flex-1 h-screen overflow-y-auto">
                 <header className="h-16 bg-white border-b flex items-center justify-between px-8 sticky top-0 z-10">
-                    <h1 className="font-semibold text-xl">{getPageTitle(location.pathname)}</h1>
+                    {/* ===== TRÁI: Page title + Cinema name ===== */}
+                    <div className="flex items-center gap-3">
+                        <h1 className="font-semibold text-xl">{getPageTitle(location.pathname)}</h1>
 
+                        {currentUser.cinema?.cinema_name && (
+                            <>
+                                <span className="text-gray-300">|</span>
+                                <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                                    <Building2 size={14} className="text-red-500" />
+                                    <span>{currentUser.cinema.cinema_name}</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* ===== PHẢI: User info ===== */}
                     <div className="flex items-center gap-4">
                         <div className="text-right">
                             <p className="font-medium">{currentUser.full_name}</p>
-                            <p className="text-xs text-gray-500">{currentUser.role_name}</p>
+                            <p className="text-xs text-gray-500">{currentUser.role?.role_name}</p>
                         </div>
 
                         <div className="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center text-white font-bold">
@@ -212,14 +248,11 @@ const NavItem = ({ icon, label, to, pathname, exact = false, small = false }) =>
                     : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
             }`}
         >
-            {/* Gạch đỏ */}
             <span
                 className={`absolute left-0 top-3 bottom-3 w-1 bg-red-600 rounded-full transition-all duration-300
                 ${isActive ? 'opacity-100' : 'opacity-0'}`}
             />
-
             <div className={`${isActive ? 'scale-110' : ''}`}>{icon}</div>
-
             <span className="mt-1">{label}</span>
         </Link>
     );
@@ -247,7 +280,7 @@ const NavGroup = ({ children, pathname }) => {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// GROUP BUTTON (CÓ MŨI TÊN)
+// GROUP BUTTON
 ////////////////////////////////////////////////////////////////////////////////
 const NavGroupButton = ({ icon, label, open, setOpen, pathname }) => {
     const isActive = pathname.startsWith('/admin/cinemas') || pathname.startsWith('/admin/areas');
@@ -263,10 +296,7 @@ const NavGroupButton = ({ icon, label, open, setOpen, pathname }) => {
             }`}
         >
             <div className={`${isActive ? 'scale-110' : ''}`}>{icon}</div>
-
             <span className="text-[10px] mt-1">{label}</span>
-
-            {/* Mũi tên */}
             <ChevronDown
                 size={14}
                 className={`mt-1 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}

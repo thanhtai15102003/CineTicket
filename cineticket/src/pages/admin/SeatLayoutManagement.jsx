@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import CreateSeatLayoutModal from './CreateSeatLayoutModal';
+import Pagination from '../../components/common/Pagination';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const tabs = [
     { key: 'all', label: 'Tất cả' },
@@ -18,10 +20,17 @@ export default function SeatLayoutManagement() {
     const navigate = useNavigate();
     const [showModal, setShowModal] = useState(false);
 
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
+
     /* ================= FETCH ================= */
     useEffect(() => {
         fetchLayouts();
     }, []);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, activeTab]);
 
     const fetchLayouts = async () => {
         try {
@@ -59,6 +68,9 @@ export default function SeatLayoutManagement() {
         const matchSearch = l.name.toLowerCase().includes(search.toLowerCase());
         return matchTab && matchSearch;
     });
+
+    const totalPages = Math.ceil(filteredLayouts.length / ITEMS_PER_PAGE);
+    const pagedLayouts = filteredLayouts.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     /* ================= DELETE ================= */
     const handleDelete = async (id) => {
@@ -181,11 +193,11 @@ export default function SeatLayoutManagement() {
                         {loading ? (
                             <tr>
                                 <td colSpan="6" className="text-center p-6">
-                                    Loading...
+                                    <LoadingSpinner />
                                 </td>
                             </tr>
                         ) : (
-                            filteredLayouts.map((layout) => (
+                            pagedLayouts.map((layout) => (
                                 <tr key={layout.layout_id} className="border-t">
                                     {/* NAME */}
                                     <td className="p-3">
@@ -249,9 +261,7 @@ export default function SeatLayoutManagement() {
                                             size={16}
                                             className="cursor-pointer"
                                             onClick={() =>
-                                                navigate(
-                                                    `/admin/seat-layout/${layout.layout_id}/edit`
-                                                )
+                                                navigate(`/admin/seat-layout/${layout.layout_id}`)
                                             }
                                         />
 
@@ -267,8 +277,8 @@ export default function SeatLayoutManagement() {
                     </tbody>
                 </table>
 
-                {!loading && filteredLayouts.length === 0 && (
-                    <div className="p-6 text-center text-gray-400">Không có dữ liệu</div>
+                {!loading && filteredLayouts.length > 0 && (
+                    <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
                 )}
             </div>
 

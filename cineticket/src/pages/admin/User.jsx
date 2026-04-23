@@ -1,35 +1,37 @@
 import { useState, useEffect } from 'react';
 import Toast from '../../components/common/Toast';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Pagination from '../../components/common/Pagination';
 
 const BASE_URL = 'https://cinema-api-production-f2bc.up.railway.app/api/v1';
 
 const Users = () => {
     const [users, setUsers] = useState([]);
+    const [cinemas, setCinemas] = useState([]);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('all');
+
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 4;
+    const itemsPerPage = 5;
+
+    const [loading, setLoading] = useState(false);
 
     const [form, setForm] = useState({
-        user_id: null,
         username: '',
         password_hash: '',
         full_name: '',
         email: '',
         phone: '',
-        gender: 'Nam',
-        date_of_birth: '',
-        role_name: 'admin',
-        status: 'active',
-        region: 'TP. Hồ Chí Minh',
         cinema_id: ''
     });
 
     const [successMessage, setSuccessMessage] = useState('');
 
-    // ================== LOAD API ==================
+    // ================== FETCH MANAGERS ==================
     const fetchManagers = async () => {
         try {
+            setLoading(true);
             const token = localStorage.getItem('token');
 
             const res = await fetch(`${BASE_URL}/admin/managers`, {
@@ -49,7 +51,8 @@ const Users = () => {
                     email: u.email,
                     phone: u.phone,
                     status: u.status,
-                    role_name: 'admin'
+                    role_name: 'admin',
+                    cinema_name: u.cinema?.cinema_name || 'Không có'
                 }));
 
                 setUsers(mappedUsers);
@@ -59,18 +62,49 @@ const Users = () => {
         } catch (err) {
             console.error(err);
             alert('Lỗi API');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ================== FETCH CINEMAS ==================
+    const fetchCinemas = async () => {
+        try {
+            const token = localStorage.getItem('token');
+
+            const res = await fetch(`${BASE_URL}/admin/cinemas`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: 'application/json'
+                }
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setCinemas(data.data);
+            } else {
+                alert('Không lấy được danh sách chi nhánh');
+            }
+        } catch (err) {
+            console.error(err);
         }
     };
 
     useEffect(() => {
         fetchManagers();
+        fetchCinemas();
     }, []);
 
-    // ================== TOGGLE STATUS (NEW) ==================
+    // reset page khi search/filter
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterRole]);
+
+    // ================== TOGGLE STATUS ==================
     const toggleStatus = async (id, currentStatus) => {
         try {
             const token = localStorage.getItem('token');
-
             const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
 
             const res = await fetch(`${BASE_URL}/admin/managers/${id}/status`, {
@@ -80,19 +114,15 @@ const Users = () => {
                     Authorization: `Bearer ${token}`,
                     Accept: 'application/json'
                 },
-                body: JSON.stringify({
-                    status: newStatus
-                })
+                body: JSON.stringify({ status: newStatus })
             });
-
-            const data = await res.json();
 
             if (res.ok) {
                 setUsers((prev) =>
                     prev.map((u) => (u.user_id === id ? { ...u, status: newStatus } : u))
                 );
             } else {
-                alert(data.message || 'Lỗi cập nhật trạng thái');
+                alert('Lỗi cập nhật trạng thái');
             }
         } catch (err) {
             console.error(err);
@@ -126,33 +156,20 @@ const Users = () => {
 
             if (res.ok) {
                 setSuccessMessage('Tạo admin thành công!');
+                setForm({
+                    username: '',
+                    password_hash: '',
+                    full_name: '',
+                    email: '',
+                    phone: '',
+                    cinema_id: ''
+                });
                 fetchManagers();
             } else {
                 alert(data.message || 'Lỗi tạo admin');
             }
         } catch (err) {
             console.error(err);
-        }
-    };
-
-    // ================== DELETE ==================
-    const handleDelete = async (id) => {
-        if (!confirm('Xóa tài khoản này?')) return;
-
-        try {
-            const token = localStorage.getItem('token');
-
-            await fetch(`${BASE_URL}/admin/managers/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-
-            setSuccessMessage('Đã xóa!');
-            fetchManagers();
-        } catch (err) {
-            alert('Lỗi xóa');
         }
     };
 
@@ -168,21 +185,77 @@ const Users = () => {
         );
     });
 
+    const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
     const currentUsers = filteredUsers.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
     );
 
-    // ================== UI ==================
     return (
         <div className="p-6 max-w-7xl mx-auto">
             {successMessage && (
                 <Toast message={successMessage} onClose={() => setSuccessMessage('')} />
             )}
 
-            {/* FORM (GIỮ NGUYÊN) */}
+            {/* FORM */}
             <div className="bg-white p-8 rounded-2xl shadow-lg mb-10">
                 <h3 className="text-2xl font-semibold mb-6">Tạo tài khoản Admin</h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <input
+                        type="text"
+                        placeholder="Tên"
+                        value={form.full_name}
+                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    />
+
+                    <input
+                        type="text"
+                        placeholder="Username"
+                        value={form.username}
+                        onChange={(e) => setForm({ ...form, username: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    />
+
+                    <input
+                        type="email"
+                        placeholder="Email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    />
+
+                    <input
+                        type="text"
+                        placeholder="Số điện thoại"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    />
+
+                    <input
+                        type="password"
+                        placeholder="Mật khẩu"
+                        value={form.password_hash}
+                        onChange={(e) => setForm({ ...form, password_hash: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    />
+
+                    <select
+                        value={form.cinema_id}
+                        onChange={(e) => setForm({ ...form, cinema_id: e.target.value })}
+                        className="border p-3 rounded-xl"
+                    >
+                        <option value="">Chọn chi nhánh</option>
+                        {cinemas.map((c) => (
+                            <option key={c.cinema_id} value={c.cinema_id}>
+                                {c.cinema_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
 
                 <button
                     onClick={handleSave}
@@ -205,49 +278,64 @@ const Users = () => {
                         <tr>
                             <th className="p-4 text-left">Tên</th>
                             <th className="p-4 text-left">Username</th>
+                            <th className="p-4 text-left">Chi nhánh</th>
                             <th className="p-4 text-left">Email</th>
+                            <th className="p-4 text-left">SĐT</th>
                             <th className="p-4 text-left">Trạng thái</th>
-                            <th className="p-4 text-center">Action</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        {currentUsers.map((user) => (
-                            <tr key={user.user_id} className="border-t">
-                                <td className="p-4">{user.full_name}</td>
-                                <td className="p-4">{user.username}</td>
-                                <td className="p-4">{user.email}</td>
-
-                                {/* ================= STATUS TOGGLE ================= */}
-                                <td className="p-4">
-                                    <button
-                                        onClick={() => toggleStatus(user.user_id, user.status)}
-                                        className={`w-12 h-6 rounded-full ${
-                                            user.status === 'active'
-                                                ? 'bg-green-500'
-                                                : 'bg-gray-300'
-                                        }`}
-                                    >
-                                        <div
-                                            className={`w-5 h-5 bg-white rounded-full transition ${
-                                                user.status === 'active' ? 'translate-x-6' : ''
-                                            }`}
-                                        />
-                                    </button>
-                                </td>
-
-                                <td className="p-4 text-center">
-                                    <button
-                                        onClick={() => handleDelete(user.user_id)}
-                                        className="text-red-500"
-                                    >
-                                        Xóa
-                                    </button>
+                        {loading ? (
+                            <tr>
+                                <td colSpan="6" className="text-center p-6">
+                                    <LoadingSpinner />
                                 </td>
                             </tr>
-                        ))}
+                        ) : currentUsers.length === 0 ? (
+                            <tr>
+                                <td colSpan="6" className="text-center p-6">
+                                    Không có dữ liệu
+                                </td>
+                            </tr>
+                        ) : (
+                            currentUsers.map((user) => (
+                                <tr key={user.user_id} className="border-t">
+                                    <td className="p-4">{user.full_name}</td>
+                                    <td className="p-4">{user.username}</td>
+                                    <td className="p-4">{user.cinema_name}</td>
+                                    <td className="p-4">{user.email}</td>
+                                    <td className="p-4">{user.phone}</td>
+
+                                    <td className="p-4">
+                                        <button
+                                            onClick={() => toggleStatus(user.user_id, user.status)}
+                                            className={`w-12 h-6 rounded-full ${
+                                                user.status === 'active'
+                                                    ? 'bg-green-500'
+                                                    : 'bg-gray-300'
+                                            }`}
+                                        >
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full transition ${
+                                                    user.status === 'active' ? 'translate-x-6' : ''
+                                                }`}
+                                            />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
+
+                {!loading && totalPages > 1 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={(page) => setCurrentPage(page)}
+                    />
+                )}
             </div>
         </div>
     );

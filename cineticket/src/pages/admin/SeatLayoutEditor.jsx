@@ -63,7 +63,11 @@ const SeatLayoutEditor = () => {
         if (seat.type === 'double' && seat.pair !== null) {
             const pairIndex = seat.pair;
             newGrid[rIndex].seats[sIndex] = { ...seat, type: null, pair: null };
-            newGrid[rIndex].seats[pairIndex] = { ...newGrid[rIndex].seats[pairIndex], type: null, pair: null };
+            newGrid[rIndex].seats[pairIndex] = {
+                ...newGrid[rIndex].seats[pairIndex],
+                type: null,
+                pair: null
+            };
         } else {
             newGrid[rIndex].seats[sIndex] = { ...seat, type: null, pair: null };
         }
@@ -79,7 +83,11 @@ const SeatLayoutEditor = () => {
                     row.seats[i + 1] = { ...row.seats[i + 1], type: 'double', pair: i };
                 }
             } else {
-                row.seats = row.seats.map((s) => ({ ...s, type: selectedType === 'null' ? null : selectedType, pair: null }));
+                row.seats = row.seats.map((s) => ({
+                    ...s,
+                    type: selectedType === 'null' ? null : selectedType,
+                    pair: null
+                }));
             }
             return [...newGrid];
         });
@@ -88,7 +96,11 @@ const SeatLayoutEditor = () => {
     const clearRow = (rIndex) => {
         setGrid((prev) => {
             const newGrid = [...prev];
-            newGrid[rIndex].seats = newGrid[rIndex].seats.map((s) => ({ ...s, type: null, pair: null }));
+            newGrid[rIndex].seats = newGrid[rIndex].seats.map((s) => ({
+                ...s,
+                type: null,
+                pair: null
+            }));
             return [...newGrid];
         });
     };
@@ -100,15 +112,35 @@ const SeatLayoutEditor = () => {
             const hasSeat = grid.some((r) => r.seats.some((s) => s.type));
             if (!hasSeat) return showToast('Bạn chưa thiết kế ghế nào ❌');
             setLoading(true);
-            const payload = { name, description, row_count: grid.length, column_count: grid[0].seats.length, layout_data: grid };
-            const res = await fetch('https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts', {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) { showToast('Lưu sơ đồ thành công 🎉'); setTimeout(() => navigate('/admin/seat-layout'), 1500); }
-            else { showToast('Lỗi khi lưu sơ đồ ❌'); }
-        } catch (_) { showToast('Lỗi server ❌'); } finally { setLoading(false); }
+            const payload = {
+                name,
+                description,
+                row_count: grid.length,
+                column_count: grid[0].seats.length,
+                layout_data: grid
+            };
+            const res = await fetch(
+                'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts',
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+            if (res.ok) {
+                showToast('Lưu sơ đồ thành công 🎉');
+                setTimeout(() => navigate('/admin/seat-layout'), 1500);
+            } else {
+                showToast('Lỗi khi lưu sơ đồ ❌');
+            }
+        } catch (_) {
+            showToast('Lỗi server ❌');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const renderIcon = (seat, index) => {
@@ -123,19 +155,29 @@ const SeatLayoutEditor = () => {
 
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
-            {toast.show && <Toast message={toast.message} onClose={() => setToast({ show: false, message: '' })} />}
+            {toast.show && (
+                <Toast
+                    message={toast.message}
+                    onClose={() => setToast({ show: false, message: '' })}
+                />
+            )}
 
             {/* HEADER */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-sm border">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="p-2 bg-white rounded-full shadow-sm border"
+                    >
                         <ChevronLeft size={20} />
                     </button>
                     <h1 className="text-2xl font-bold text-gray-800">{name}</h1>
                 </div>
                 <div className="bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-100 flex items-center gap-2">
                     <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                    <span className="text-xs font-bold text-blue-700 uppercase">Thiết kế sơ đồ</span>
+                    <span className="text-xs font-bold text-blue-700 uppercase">
+                        Thiết kế sơ đồ
+                    </span>
                 </div>
             </div>
 
@@ -145,18 +187,25 @@ const SeatLayoutEditor = () => {
                     {/* MÀN HÌNH */}
                     <div className="mb-12 flex flex-col items-center">
                         <div className="w-3/4 h-1.5 bg-gray-200 rounded-full shadow-inner"></div>
-                        <p className="text-[9px] text-gray-600 mt-2 tracking-widest uppercase font-bold">Màn hình</p>
+                        <p className="text-[9px] text-gray-600 mt-2 tracking-widest uppercase font-bold">
+                            Màn hình
+                        </p>
                     </div>
 
                     {/* GRID */}
                     <div className="flex flex-col gap-3 items-center">
                         {grid.map((row, rIndex) => (
                             <div key={row.label} className="flex items-center gap-4">
-                                <div className="w-5 font-bold text-gray-600 text-xs text-center">{row.label}</div>
-                                
-                                <div 
+                                <div className="w-5 font-bold text-gray-600 text-xs text-center">
+                                    {row.label}
+                                </div>
+
+                                <div
                                     className="grid gap-1.5"
-                                    style={{ gridTemplateColumns: `repeat(${row.seats.length}, 40px)`, gridAutoRows: '40px' }}
+                                    style={{
+                                        gridTemplateColumns: `repeat(${row.seats.length}, 40px)`,
+                                        gridAutoRows: '40px'
+                                    }}
                                 >
                                     {row.seats.map((seat, sIndex) => {
                                         const isDouble = seat.type === 'double';
@@ -200,13 +249,35 @@ const SeatLayoutEditor = () => {
                 {/* PHẢI: TYPE SELECTOR */}
                 <div className="w-72 flex flex-col gap-6">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border">
-                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Loại ghế</h3>
+                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
+                            Loại ghế
+                        </h3>
                         <div className="space-y-2">
-                            <ToolBtn active={selectedType === 'regular'} onClick={() => setSelectedType('regular')} icon={<IconArmchair size={20} className="text-blue-500" />} label="Thường" />
-                            <ToolBtn active={selectedType === 'vip'} onClick={() => setSelectedType('vip')} icon={<IconArmchair2 size={20} className="text-amber-500" />} label="VIP" />
-                            <ToolBtn active={selectedType === 'double'} onClick={() => setSelectedType('double')} icon={<IconSofa size={22} className="text-pink-500" />} label="Ghế đôi" />
+                            <ToolBtn
+                                active={selectedType === 'regular'}
+                                onClick={() => setSelectedType('regular')}
+                                icon={<IconArmchair size={20} className="text-blue-500" />}
+                                label="Thường"
+                            />
+                            <ToolBtn
+                                active={selectedType === 'vip'}
+                                onClick={() => setSelectedType('vip')}
+                                icon={<IconArmchair2 size={20} className="text-amber-500" />}
+                                label="VIP"
+                            />
+                            <ToolBtn
+                                active={selectedType === 'double'}
+                                onClick={() => setSelectedType('double')}
+                                icon={<IconSofa size={22} className="text-pink-500" />}
+                                label="Ghế đôi"
+                            />
                             <div className="pt-2 border-t mt-2">
-                                <ToolBtn active={selectedType === 'null'} onClick={() => setSelectedType('null')} icon={<IconEraser size={20} className="text-gray-400" />} label="Tẩy xóa" />
+                                <ToolBtn
+                                    active={selectedType === 'null'}
+                                    onClick={() => setSelectedType('null')}
+                                    icon={<IconEraser size={20} className="text-gray-400" />}
+                                    label="Tẩy xóa"
+                                />
                             </div>
                         </div>
                     </div>
@@ -218,7 +289,13 @@ const SeatLayoutEditor = () => {
                             ${loading ? 'bg-gray-300' : 'bg-black hover:bg-gray-800'}
                         `}
                     >
-                        {loading ? 'ĐANG LƯU...' : <><Save size={18} /> LƯU SƠ ĐỒ</>}
+                        {loading ? (
+                            'ĐANG LƯU...'
+                        ) : (
+                            <>
+                                <Save size={18} /> LƯU SƠ ĐỒ
+                            </>
+                        )}
                     </button>
                 </div>
             </div>
@@ -234,7 +311,9 @@ const ToolBtn = ({ icon, label, active, onClick }) => (
         }`}
     >
         <div className="scale-90">{icon}</div>
-        <span className={`font-bold text-[13px] ${active ? 'text-blue-700' : 'text-gray-600'}`}>{label}</span>
+        <span className={`font-bold text-[13px] ${active ? 'text-blue-700' : 'text-gray-600'}`}>
+            {label}
+        </span>
     </button>
 );
 
