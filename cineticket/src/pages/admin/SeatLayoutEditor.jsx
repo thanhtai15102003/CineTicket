@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Save, ChevronLeft, Info } from 'lucide-react';
-import { IconArmchair, IconArmchair2, IconSofa, IconEraser } from '@tabler/icons-react';
+import { Save, ChevronLeft, MoveHorizontal } from 'lucide-react'; // 👈 Thêm MoveHorizontal
+import { IconArmchair, IconArmchair2, IconSofa, IconEraser } from '@tabler/icons-react'; // Xoá IconSpacingWidth
 import { useNavigate, useLocation } from 'react-router-dom';
 import Toast from '../../components/common/Toast';
 
@@ -52,7 +52,9 @@ const SeatLayoutEditor = () => {
                 handleSeatClear(newGrid, rIndex, sIndex);
                 return [...newGrid];
             }
+            // Nếu đổi từ ghế đôi sang loại khác (kể cả lối đi), cần clear ghế đôi cũ
             if (row.seats[sIndex].type === 'double') handleSeatClear(newGrid, rIndex, sIndex);
+
             row.seats[sIndex] = { ...row.seats[sIndex], type: selectedType, pair: null };
             return [...newGrid];
         });
@@ -109,8 +111,11 @@ const SeatLayoutEditor = () => {
         try {
             const token = localStorage.getItem('token');
             if (!token) return showToast('Chưa đăng nhập ❌');
-            const hasSeat = grid.some((r) => r.seats.some((s) => s.type));
+
+            // Cập nhật điều kiện check: ít nhất 1 ghế thường/vip/đôi mới được lưu (bỏ qua null và aisle)
+            const hasSeat = grid.some((r) => r.seats.some((s) => s.type && s.type !== 'aisle'));
             if (!hasSeat) return showToast('Bạn chưa thiết kế ghế nào ❌');
+
             setLoading(true);
             const payload = {
                 name,
@@ -145,6 +150,7 @@ const SeatLayoutEditor = () => {
 
     const renderIcon = (seat, index) => {
         if (!seat.type) return <div className="text-gray-200 text-[10px]">+</div>;
+        if (seat.type === 'aisle') return null; // Lối đi không render icon ghế
         if (seat.type === 'double') {
             if (seat.pair < index) return null;
             return <IconSofa size={24} className="text-pink-500" />;
@@ -182,7 +188,7 @@ const SeatLayoutEditor = () => {
             </div>
 
             <div className="flex gap-8">
-                {/* TRÁI: AREA THIẾT KẾ (KHÔNG CÓ THANH KÉO) */}
+                {/* TRÁI: AREA THIẾT KẾ */}
                 <div className="flex-grow bg-white p-8 rounded-[2rem] shadow-sm border overflow-hidden">
                     {/* MÀN HÌNH */}
                     <div className="mb-12 flex flex-col items-center">
@@ -194,55 +200,80 @@ const SeatLayoutEditor = () => {
 
                     {/* GRID */}
                     <div className="flex flex-col gap-3 items-center">
-                        {grid.map((row, rIndex) => (
-                            <div key={row.label} className="flex items-center gap-4">
-                                <div className="w-5 font-bold text-gray-600 text-xs text-center">
-                                    {row.label}
-                                </div>
+                        {grid.map((row, rIndex) => {
+                            // Biến đếm số ghế để in lên UI (bỏ qua Aisle và Null)
+                            let currentSeatNum = 1;
 
-                                <div
-                                    className="grid gap-1.5"
-                                    style={{
-                                        gridTemplateColumns: `repeat(${row.seats.length}, 40px)`,
-                                        gridAutoRows: '40px'
-                                    }}
-                                >
-                                    {row.seats.map((seat, sIndex) => {
-                                        const isDouble = seat.type === 'double';
-                                        if (isDouble && seat.pair < sIndex) return null;
-                                        return (
-                                            <div
-                                                key={seat.id}
-                                                onClick={() => handleSeatClick(rIndex, sIndex)}
-                                                style={{ gridColumn: isDouble ? 'span 2' : 'auto' }}
-                                                className={`flex items-center justify-center cursor-pointer transition-all border rounded-lg hover:scale-105 active:scale-95
-                                                    ${seat.type ? 'bg-white shadow-sm border-gray-100' : 'bg-gray-100 border-dashed border-gray-300'}
-                                                    ${isDouble ? 'bg-pink-50 border-pink-100' : ''}
-                                                `}
-                                            >
-                                                {renderIcon(seat, sIndex)}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                            return (
+                                <div key={row.label} className="flex items-center gap-4">
+                                    <div className="w-5 font-bold text-gray-600 text-xs text-center">
+                                        {row.label}
+                                    </div>
 
-                                {/* ✅ NÚT + - NHƯ CODE BAN ĐẦU */}
-                                <div className="flex gap-1 ml-2">
-                                    <button
-                                        onClick={() => applyRow(rIndex)}
-                                        className="w-6 h-6 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white text-[10px] rounded font-bold transition-colors"
+                                    <div
+                                        className="grid gap-1.5"
+                                        style={{
+                                            gridTemplateColumns: `repeat(${row.seats.length}, 40px)`,
+                                            gridAutoRows: '40px'
+                                        }}
                                     >
-                                        +
-                                    </button>
-                                    <button
-                                        onClick={() => clearRow(rIndex)}
-                                        className="w-6 h-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white text-[10px] rounded font-bold transition-colors"
-                                    >
-                                        -
-                                    </button>
+                                        {row.seats.map((seat, sIndex) => {
+                                            const isDouble = seat.type === 'double';
+                                            const isAisle = seat.type === 'aisle';
+
+                                            if (isDouble && seat.pair < sIndex) return null;
+
+                                            // Gán số ghế hiện tại nếu là ghế hợp lệ
+                                            const displayNum =
+                                                seat.type && !isAisle ? currentSeatNum : '';
+                                            if (seat.type && !isAisle)
+                                                currentSeatNum += isDouble ? 2 : 1;
+
+                                            return (
+                                                <div
+                                                    key={seat.id}
+                                                    onClick={() => handleSeatClick(rIndex, sIndex)}
+                                                    style={{
+                                                        gridColumn: isDouble ? 'span 2' : 'auto'
+                                                    }}
+                                                    className={`relative flex items-center justify-center cursor-pointer transition-all border rounded-lg hover:scale-105 active:scale-95
+                                                        ${!seat.type ? 'bg-gray-100 border-dashed border-gray-300' : ''}
+                                                        ${seat.type && !isAisle && !isDouble ? 'bg-white shadow-sm border-gray-200' : ''}
+                                                        ${isDouble ? 'bg-pink-50 border-pink-100' : ''}
+                                                        ${isAisle ? 'bg-transparent border-dashed border-gray-300 opacity-50' : ''} /* 👈 Lối đi */
+                                                    `}
+                                                >
+                                                    {renderIcon(seat, sIndex)}
+
+                                                    {/* Hiển thị số ghế lên góc (Xoá số nếu là Lối đi) */}
+                                                    {displayNum !== '' && (
+                                                        <span className="absolute -top-1.5 -right-1.5 text-[8px] bg-gray-700 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
+                                                            {displayNum}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* NÚT + - */}
+                                    <div className="flex gap-1 ml-2">
+                                        <button
+                                            onClick={() => applyRow(rIndex)}
+                                            className="w-6 h-6 flex items-center justify-center bg-green-500 hover:bg-green-600 text-white text-[10px] rounded font-bold transition-colors"
+                                        >
+                                            +
+                                        </button>
+                                        <button
+                                            onClick={() => clearRow(rIndex)}
+                                            className="w-6 h-6 flex items-center justify-center bg-red-500 hover:bg-red-600 text-white text-[10px] rounded font-bold transition-colors"
+                                        >
+                                            -
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -250,7 +281,7 @@ const SeatLayoutEditor = () => {
                 <div className="w-72 flex flex-col gap-6">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border">
                         <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
-                            Loại ghế
+                            Loại ghế / Thiết lập
                         </h3>
                         <div className="space-y-2">
                             <ToolBtn
@@ -271,12 +302,20 @@ const SeatLayoutEditor = () => {
                                 icon={<IconSofa size={22} className="text-pink-500" />}
                                 label="Ghế đôi"
                             />
+                            {/* 👈 Đã sửa icon thành MoveHorizontal từ lucide-react */}
+                            <ToolBtn
+                                active={selectedType === 'aisle'}
+                                onClick={() => setSelectedType('aisle')}
+                                icon={<MoveHorizontal size={20} className="text-indigo-400" />}
+                                label="Lối đi (Aisle)"
+                            />
+
                             <div className="pt-2 border-t mt-2">
                                 <ToolBtn
                                     active={selectedType === 'null'}
                                     onClick={() => setSelectedType('null')}
                                     icon={<IconEraser size={20} className="text-gray-400" />}
-                                    label="Tẩy xóa"
+                                    label="Tẩy xóa (Xoá ghế)"
                                 />
                             </div>
                         </div>

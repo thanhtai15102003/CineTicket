@@ -6,6 +6,7 @@ import MovieDetail from './pages/client/MovieDetail';
 import Booking from './pages/client/Booking';
 import Login from './pages/client/Login';
 import ComboPage from './pages/client/ComboPage';
+import Profile from './pages/client/Profile';
 
 import AdminLayout from './layouts/AdminLayout';
 import Dashboard from './pages/admin/DashBoard';
@@ -31,6 +32,15 @@ function App() {
                     element={
                         <MainLayout>
                             <Home />
+                        </MainLayout>
+                    }
+                />
+                {/* Trang profile */}
+                <Route
+                    path="/profile"
+                    element={
+                        <MainLayout>
+                            <Profile />
                         </MainLayout>
                     }
                 />

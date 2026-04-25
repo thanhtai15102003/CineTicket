@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, XCircle, Info, ChevronLeft } from 'lucide-react';
+import { Save, XCircle, Info, ChevronLeft, MoveHorizontal } from 'lucide-react';
 import { IconArmchair, IconArmchair2, IconSofa, IconEraser } from '@tabler/icons-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Toast from '../../components/common/Toast';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-
 
 const SeatLayout = () => {
     const { id } = useParams();
@@ -57,9 +56,9 @@ const SeatLayout = () => {
     /* ================= LOGIC THAY ĐỔI GHẾ ================= */
     const handleSeatClick = (rIndex, sIndex) => {
         setGrid((prev) => {
-            const newGrid = prev.map(row => ({
+            const newGrid = prev.map((row) => ({
                 ...row,
-                seats: row.seats.map(s => ({ ...s }))
+                seats: row.seats.map((s) => ({ ...s }))
             }));
             const row = newGrid[rIndex];
             const seat = row.seats[sIndex];
@@ -85,7 +84,7 @@ const SeatLayout = () => {
                 return newGrid;
             }
 
-            // Nếu đang là ghế đôi → xóa cặp trước
+            // Nếu đang là ghế đôi → xóa cặp trước khi đổi sang loại khác
             if (seat.type === 'double') {
                 handleDeleteSeat(newGrid, rIndex, sIndex);
             }
@@ -95,13 +94,16 @@ const SeatLayout = () => {
         });
     };
 
-    // ✅ Dùng pair (index) thay vì pair_uuid
     const handleDeleteSeat = (newGrid, rIndex, sIndex) => {
         const seat = newGrid[rIndex].seats[sIndex];
         if (seat.type === 'double' && seat.pair !== null && seat.pair !== undefined) {
             const pairIndex = seat.pair;
             newGrid[rIndex].seats[sIndex] = { ...seat, type: null, pair: null };
-            newGrid[rIndex].seats[pairIndex] = { ...newGrid[rIndex].seats[pairIndex], type: null, pair: null };
+            newGrid[rIndex].seats[pairIndex] = {
+                ...newGrid[rIndex].seats[pairIndex],
+                type: null,
+                pair: null
+            };
         } else {
             newGrid[rIndex].seats[sIndex] = { ...seat, type: null, pair: null };
         }
@@ -118,7 +120,7 @@ const SeatLayout = () => {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
+                        Authorization: `Bearer ${token}`
                     },
                     body: JSON.stringify({ name, description, layout_data: grid })
                 }
@@ -138,6 +140,7 @@ const SeatLayout = () => {
 
     /* ================= ICON RENDER ================= */
     const renderIcon = (seat) => {
+        if (seat.type === 'aisle') return null; // 👈 Lối đi không render icon
         if (seat.type === 'broken') return <XCircle size={18} className="text-red-500" />;
         if (seat.type === 'vip') return <IconArmchair2 size={22} className="text-amber-500" />;
         if (seat.type === 'double') return <IconSofa size={26} className="text-pink-500" />;
@@ -149,11 +152,19 @@ const SeatLayout = () => {
 
     return (
         <div className="p-6 bg-gray-50 min-h-screen">
-            {toast.show && <Toast message={toast.message} onClose={() => setToast({ show: false, message: '' })} />}
+            {toast.show && (
+                <Toast
+                    message={toast.message}
+                    onClose={() => setToast({ show: false, message: '' })}
+                />
+            )}
 
             {/* HEADER */}
             <div className="flex items-center gap-4 mb-8">
-                <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow border">
+                <button
+                    onClick={() => navigate(-1)}
+                    className="p-2 bg-white rounded-full shadow border"
+                >
                     <ChevronLeft size={20} />
                 </button>
                 <div>
@@ -164,52 +175,81 @@ const SeatLayout = () => {
 
             <div className="flex gap-10">
                 {/* TRÁI: SƠ ĐỒ GHẾ */}
-                <div className="flex-grow bg-white p-10 rounded-3xl shadow-sm border">
+                <div className="flex-grow bg-white p-10 rounded-3xl shadow-sm border overflow-hidden">
                     <div className="mb-14 flex flex-col items-center">
                         <div className="w-4/5 h-2 bg-gray-300 rounded-full shadow-inner"></div>
-                        <p className="text-[10px] text-gray-400 mt-2 tracking-[0.3em] uppercase">Màn hình</p>
+                        <p className="text-[10px] text-gray-400 mt-2 tracking-[0.3em] uppercase font-bold">
+                            Màn hình
+                        </p>
                     </div>
 
                     <div className="flex flex-col gap-4 items-center">
-                        {grid.map((row, rIndex) => (
-                            <div key={rIndex} className="flex items-center gap-6">
-                                <div className="w-6 font-bold text-gray-600 text-sm">{row.label}</div>
+                        {grid.map((row, rIndex) => {
+                            // Biến đếm số ghế hiển thị trên UI
+                            let currentSeatNum = 1;
 
-                                {/* ✅ Grid dùng gridTemplateColumns để double span đúng */}
-                                <div
-                                    className="grid gap-2"
-                                    style={{
-                                        gridTemplateColumns: `repeat(${row.seats.length}, 40px)`,
-                                        gridAutoRows: '40px'
-                                    }}
-                                >
-                                    {row.seats.map((seat, sIndex) => {
-                                        const isDouble = seat.type === 'double';
+                            return (
+                                <div key={rIndex} className="flex items-center gap-6">
+                                    <div className="w-6 font-bold text-gray-600 text-sm">
+                                        {row.label}
+                                    </div>
 
-                                        // ✅ Ẩn ghế thứ 2 trong cặp đôi bằng pair index
-                                        if (isDouble && seat.pair !== null && seat.pair !== undefined && seat.pair < sIndex) {
-                                            return null;
-                                        }
+                                    <div
+                                        className="grid gap-2"
+                                        style={{
+                                            gridTemplateColumns: `repeat(${row.seats.length}, 40px)`,
+                                            gridAutoRows: '40px'
+                                        }}
+                                    >
+                                        {row.seats.map((seat, sIndex) => {
+                                            const isDouble = seat.type === 'double';
+                                            const isAisle = seat.type === 'aisle';
 
-                                        return (
-                                            <div
-                                                key={`${row.label}${sIndex}`}
-                                                onClick={() => handleSeatClick(rIndex, sIndex)}
-                                                style={{
-                                                    gridColumn: isDouble ? 'span 2' : 'auto'
-                                                }}
-                                                className={`flex items-center justify-center cursor-pointer transition-all border rounded-lg hover:scale-105 active:scale-95
-                                                    ${seat.type ? 'bg-white shadow-sm border-gray-100' : 'bg-gray-50 border-dashed border-gray-300'}
-                                                    ${isDouble ? 'bg-pink-50 border-pink-200' : ''}
-                                                `}
-                                            >
-                                                {renderIcon(seat)}
-                                            </div>
-                                        );
-                                    })}
+                                            // Ẩn ghế thứ 2 trong cặp đôi
+                                            if (
+                                                isDouble &&
+                                                seat.pair !== null &&
+                                                seat.pair !== undefined &&
+                                                seat.pair < sIndex
+                                            ) {
+                                                return null;
+                                            }
+
+                                            // Gán số ghế hiện tại nếu là ghế hợp lệ (ghế hư vẫn có số)
+                                            const displayNum =
+                                                seat.type && !isAisle ? currentSeatNum : '';
+                                            if (seat.type && !isAisle)
+                                                currentSeatNum += isDouble ? 2 : 1;
+
+                                            return (
+                                                <div
+                                                    key={`${row.label}${sIndex}`}
+                                                    onClick={() => handleSeatClick(rIndex, sIndex)}
+                                                    style={{
+                                                        gridColumn: isDouble ? 'span 2' : 'auto'
+                                                    }}
+                                                    className={`relative flex items-center justify-center cursor-pointer transition-all border rounded-lg hover:scale-105 active:scale-95
+                                                        ${!seat.type ? 'bg-gray-50 border-dashed border-gray-300' : ''}
+                                                        ${seat.type && !isAisle && !isDouble ? 'bg-white shadow-sm border-gray-100' : ''}
+                                                        ${isDouble ? 'bg-pink-50 border-pink-200' : ''}
+                                                        ${isAisle ? 'bg-transparent border-dashed border-gray-300 opacity-50' : ''} /* Lối đi */
+                                                    `}
+                                                >
+                                                    {renderIcon(seat)}
+
+                                                    {/* Hiển thị số ghế lên góc */}
+                                                    {displayNum !== '' && (
+                                                        <span className="absolute -top-1.5 -right-1.5 text-[8px] bg-gray-700 text-white w-4 h-4 flex items-center justify-center rounded-full shadow-sm">
+                                                            {displayNum}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -222,7 +262,9 @@ const SeatLayout = () => {
                         </h3>
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs text-gray-400 uppercase font-bold">Tên sơ đồ</label>
+                                <label className="text-xs text-gray-400 uppercase font-bold">
+                                    Tên sơ đồ
+                                </label>
                                 <input
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -230,7 +272,9 @@ const SeatLayout = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-gray-400 uppercase font-bold">Mô tả</label>
+                                <label className="text-xs text-gray-400 uppercase font-bold">
+                                    Mô tả
+                                </label>
                                 <textarea
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -243,7 +287,9 @@ const SeatLayout = () => {
 
                     {/* CHỌN LOẠI GHẾ */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border">
-                        <h3 className="font-bold mb-4 tracking-tight">Chọn loại ghế muốn thay đổi</h3>
+                        <h3 className="font-bold mb-4 tracking-tight">
+                            Chọn loại ghế muốn thay đổi
+                        </h3>
                         <div className="grid grid-cols-2 gap-3">
                             <LegendBtn
                                 active={selectedType === 'regular'}
@@ -262,6 +308,12 @@ const SeatLayout = () => {
                                 onClick={() => setSelectedType('double')}
                                 icon={<IconSofa className="text-pink-500" />}
                                 text="Ghế Đôi"
+                            />
+                            <LegendBtn
+                                active={selectedType === 'aisle'}
+                                onClick={() => setSelectedType('aisle')}
+                                icon={<MoveHorizontal className="text-indigo-400" />}
+                                text="Lối đi"
                             />
                             <LegendBtn
                                 active={selectedType === 'broken'}
@@ -303,7 +355,9 @@ const LegendBtn = ({ icon, text, active, onClick }) => (
         }`}
     >
         <div className="scale-110">{icon}</div>
-        <span className={`text-sm font-medium ${active ? 'text-blue-700' : 'text-gray-600'}`}>{text}</span>
+        <span className={`text-sm font-medium ${active ? 'text-blue-700' : 'text-gray-600'}`}>
+            {text}
+        </span>
     </button>
 );
 

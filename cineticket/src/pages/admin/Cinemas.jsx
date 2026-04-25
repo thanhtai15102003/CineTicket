@@ -59,7 +59,7 @@ const Cinemas = () => {
             const mapped = res.data.data.map((item) => ({
                 id: item.cinema_id,
                 cinema_name: item.cinema_name,
-                branch: item.region?.full_location || '---',
+                branch: item.region?.city || '---',
                 region_id: item.region?.region_id || '',
                 address: item.address,
                 phone: item.phone || '',
@@ -123,6 +123,19 @@ const Cinemas = () => {
             return;
         }
 
+        // ✅ check trùng
+        const isDuplicate = cinemas.some(
+            (c) =>
+                c.cinema_name.trim().toLowerCase() === form.cinema_name.trim().toLowerCase() &&
+                c.region_id === form.branch &&
+                c.id !== editingId
+        );
+
+        if (isDuplicate) {
+            showToast('Rạp đã tồn tại trong khu vực này ❌');
+            return;
+        }
+
         try {
             setSubmitting(true);
 
@@ -158,11 +171,11 @@ const Cinemas = () => {
             setOpenModal(false);
             resetForm();
         } catch {
-            showToast('Thất bại ❌');
+            showToast('Rạp đã tồn tại trong khu vực này ❌');
         } finally {
             setSubmitting(false);
         }
-    };
+    };;
 
     // ================== EDIT ==================
     const handleEdit = (item) => {
@@ -313,7 +326,7 @@ const Cinemas = () => {
                             <option value="">Chọn khu vực</option>
                             {regions.map((r) => (
                                 <option key={r.region_id} value={r.region_id}>
-                                    {r.full_location}
+                                    {r.city} - {r.district}
                                 </option>
                             ))}
                         </select>
