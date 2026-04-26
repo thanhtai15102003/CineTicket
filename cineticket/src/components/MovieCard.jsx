@@ -22,9 +22,59 @@ const MovieCard = ({ movie }) => {
           ? movie.genres.split(',').map((g) => g.trim())
           : [];
 
+    // ================== LOGIC ĐỘ TUỔI ==================
+    const getAgeLimitUI = (age) => {
+        // Nếu admin không nhập, nhập 0, hoặc nhập chữ P -> Phổ biến
+        if (!age || age === '0' || age === 0 || String(age).toUpperCase() === 'P') {
+            return {
+                label: 'P',
+                bgColor: 'bg-green-500',
+                shadow: 'shadow-[0_0_12px_rgba(34,197,94,0.6)]'
+            };
+        }
+
+        // Lọc lấy số từ chuỗi (ví dụ "C18", "18+" sẽ thành 18)
+        const numAge = parseInt(String(age).replace(/\D/g, ''), 10);
+
+        if (isNaN(numAge) || numAge === 0) {
+            return {
+                label: 'P',
+                bgColor: 'bg-green-500',
+                shadow: 'shadow-[0_0_12px_rgba(34,197,94,0.6)]'
+            };
+        } else if (numAge >= 18) {
+            return {
+                label: '18+',
+                bgColor: 'bg-red-600',
+                shadow: 'shadow-[0_0_12px_rgba(220,38,38,0.6)]'
+            };
+        } else if (numAge >= 16) {
+            return {
+                label: '16+',
+                bgColor: 'bg-orange-500',
+                shadow: 'shadow-[0_0_12px_rgba(249,115,22,0.6)]'
+            };
+        } else if (numAge >= 13) {
+            return {
+                label: '13+',
+                bgColor: 'bg-blue-600',
+                shadow: 'shadow-[0_0_12px_rgba(37,99,235,0.6)]'
+            };
+        } else {
+            // Trường hợp ngoại lệ khác (ví dụ nhập 10 tuổi)
+            return {
+                label: `${numAge}+`,
+                bgColor: 'bg-teal-500',
+                shadow: 'shadow-[0_0_12px_rgba(20,184,166,0.6)]'
+            };
+        }
+    };
+
+    const ageStyle = getAgeLimitUI(movie.age_limit);
+
     return (
         <>
-            {/* Container chính: Thêm overflow-hidden để phục vụ hiệu ứng zoom hình ảnh */}
+            {/* Container chính */}
             <div className="group relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 transition-all duration-500 hover:border-zinc-700 hover:shadow-2xl hover:shadow-red-500/10">
                 {/* 1. Khu vực Poster & Hover Effects (Tỷ lệ 2:3 chuẩn cinematic) */}
                 <div
@@ -84,9 +134,11 @@ const MovieCard = ({ movie }) => {
                         </div>
                     </div>
 
-                    {/* 3. Age Limit Tag (Thiết kế lại thành bo tròn, sang hơn) */}
-                    <div className="absolute top-4 right-4 z-20 font-bold bg-red-600/90 backdrop-blur-sm text-white text-[11px] w-9 h-9 rounded-full flex items-center justify-center shadow-lg border border-red-500/20">
-                        {movie.age_limit}
+                    {/* 3. Age Limit Tag (Bo tròn, đổi màu động theo độ tuổi) */}
+                    <div
+                        className={`absolute top-3 right-3 z-20 flex items-center justify-center w-9 h-9 rounded-full text-white text-[12px] font-black tracking-wider border-2 border-zinc-950/40 backdrop-blur-md transition-colors ${ageStyle.bgColor} ${ageStyle.shadow}`}
+                    >
+                        {ageStyle.label}
                     </div>
 
                     {/* 4. Các nút chức năng (Nổi lên trên poster khi hover - Glassmorphism style) */}
@@ -127,7 +179,7 @@ const MovieCard = ({ movie }) => {
                     </div>
                 </div>
 
-                {/* 5. Khu vực Title dưới poster (Vẫn giữ để đảm bảo UI không bị trống khi không hover) */}
+                {/* 5. Khu vực Title dưới poster */}
                 <div
                     className="p-4 pt-5 text-center cursor-pointer"
                     onClick={() => navigate(`/movie/${movie.movie_id}`)}
@@ -141,7 +193,7 @@ const MovieCard = ({ movie }) => {
                 </div>
             </div>
 
-            {/* 🎬 6. Modal Trailer (Nâng cấp animation & backdrop) */}
+            {/* 🎬 6. Modal Trailer */}
             {openTrailer && (
                 <div
                     className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4 transition-all duration-300"
@@ -151,7 +203,7 @@ const MovieCard = ({ movie }) => {
                         className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-red-500/10 border border-zinc-800 animate-zoomIn"
                         onClick={(e) => e.stopPropagation()} // Ngăn đóng khi click vào video
                     >
-                        {/* Nút đóng xịn xò hơn */}
+                        {/* Nút đóng */}
                         <button
                             onClick={() => setOpenTrailer(false)}
                             className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white/70 hover:bg-white hover:text-black hover:rotate-90 transition-all duration-300"
@@ -159,7 +211,7 @@ const MovieCard = ({ movie }) => {
                             ✖
                         </button>
 
-                        {/* Video với autoplay */}
+                        {/* Video */}
                         <iframe
                             className="w-full h-full"
                             src={getEmbedUrl(movie.trailer_url)}

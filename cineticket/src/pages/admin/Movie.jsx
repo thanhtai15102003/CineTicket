@@ -4,6 +4,26 @@ import Pagination from '../../components/common/Pagination';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import Toast from '../../components/common/Toast';
 
+// Danh sách các quốc gia phổ biến sản xuất phim
+const COUNTRIES = [
+    'Việt Nam',
+    'Mỹ',
+    'Hàn Quốc',
+    'Nhật Bản',
+    'Thái Lan',
+    'Trung Quốc',
+    'Đài Loan',
+    'Hồng Kông',
+    'Anh',
+    'Pháp',
+    'Ấn Độ',
+    'Đức',
+    'Tây Ban Nha',
+    'Úc',
+    'Canada',
+    'Khác'
+];
+
 const Films = () => {
     const [search, setSearch] = useState('');
     const [openModal, setOpenModal] = useState(false);
@@ -31,9 +51,11 @@ const Films = () => {
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // Đã đổi country thành mảng countries[] để hỗ trợ chọn nhiều
     const [form, setForm] = useState({
         title: '',
         director: '',
+        countries: [], // <-- ĐỔI THÀNH MẢNG
         actors: '',
         duration: '',
         genre_ids: [],
@@ -43,8 +65,7 @@ const Films = () => {
         description: '',
         poster_url: '',
         backdrop_url: '',
-        trailer_url: '',
-        status: 'showing' // Đã chuẩn hóa theo Backend
+        trailer_url: ''
     });
 
     const [films, setFilms] = useState([]);
@@ -55,6 +76,16 @@ const Films = () => {
             genre_ids: prev.genre_ids.includes(id)
                 ? prev.genre_ids.filter((g) => g !== id)
                 : [...prev.genre_ids, id]
+        }));
+    };
+
+    // Hàm xử lý chọn nhiều Quốc gia
+    const toggleCountry = (country) => {
+        setForm((prev) => ({
+            ...prev,
+            countries: prev.countries.includes(country)
+                ? prev.countries.filter((c) => c !== country)
+                : [...prev.countries, country]
         }));
     };
 
@@ -104,6 +135,12 @@ const Films = () => {
                     release_date: m.release_date || '',
                     end_date: m.end_date || '',
                     age_limit: m.age_limit || '',
+                    country: m.country || 'N/A',
+                    // Tách chuỗi quốc gia thành mảng để lát nữa đổ vào Form Sửa
+                    raw_countries:
+                        m.country && m.country !== 'N/A'
+                            ? m.country.split(',').map((c) => c.trim())
+                            : [],
                     poster_url: m.poster_url || 'https://via.placeholder.com/100x150?text=No+Image',
                     trailer_url: m.trailer_url || '#',
                     director: m.director || 'N/A',
@@ -258,28 +295,34 @@ const Films = () => {
             return;
         }
 
+        if (form.countries.length === 0) {
+            showToast('Vui lòng chọn ít nhất 1 quốc gia ❗');
+            return;
+        }
+
         try {
             setSubmitting(true);
 
-            // BÓC TÁCH CHỈ LẤY SỐ CHO age_limit (VD: "C18" -> 18)
+            // BÓC TÁCH CHỈ LẤY SỐ CHO age_limit
             const parsedAgeLimit = form.age_limit
                 ? Number(String(form.age_limit).replace(/\D/g, ''))
                 : 0;
 
+            // Gộp mảng countries thành chuỗi nối nhau bằng dấu phẩy
             const payload = {
                 title: form.title,
                 director: form.director,
+                country: form.countries.join(', '), // Mảng ['Mỹ', 'Anh'] -> Chuỗi "Mỹ, Anh"
                 duration: Number(form.duration),
                 description: form.description,
                 release_date: form.release_date,
                 end_date: form.end_date,
-                age_limit: parsedAgeLimit, // Đã fix an toàn
+                age_limit: parsedAgeLimit,
                 poster_url: form.poster_url,
                 trailer_url: form.trailer_url,
                 actors: form.actors,
                 genre_ids: form.genre_ids,
-                backdrop_url: form.backdrop_url,
-                status: form.status
+                backdrop_url: form.backdrop_url
             };
 
             const url = isEdit
@@ -328,9 +371,11 @@ const Films = () => {
             })
             .filter(Boolean);
 
+        // Lấy mảng raw_countries đã xử lý lúc fetch
         setForm({
             title: item.title,
             director: item.director,
+            countries: item.raw_countries || [], // Đổ lại mảng vào form
             actors: item.actors?.join(', '),
             duration: item.duration,
             genre_ids: matchedGenreIds,
@@ -340,8 +385,7 @@ const Films = () => {
             description: item.description,
             poster_url: item.poster_url,
             backdrop_url: item.backdrop_url || '',
-            trailer_url: item.trailer_url,
-            status: item.status || 'showing' // Giữ chuẩn status
+            trailer_url: item.trailer_url
         });
         setEditingId(item.movie_id);
         setIsEdit(true);
@@ -356,9 +400,11 @@ const Films = () => {
         setShowGenreManager(false);
         setEditingGenre(null);
         setNewGenreName('');
+        // Xóa sạch form
         setForm({
             title: '',
             director: '',
+            countries: [], // Reset mảng
             actors: '',
             duration: '',
             genre_ids: [],
@@ -368,8 +414,7 @@ const Films = () => {
             description: '',
             poster_url: '',
             backdrop_url: '',
-            trailer_url: '',
-            status: 'showing' // Giữ chuẩn status
+            trailer_url: ''
         });
     };
 
@@ -382,12 +427,15 @@ const Films = () => {
     const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative ">
+            {/* TOAST NOTIFICATION */}
             {toast.show && (
-                <Toast
-                    message={toast.message}
-                    onClose={() => setToast({ show: false, message: '' })}
-                />
+                <div className="fixed top-20 right-8 z-[200]">
+                    <Toast
+                        message={toast.message}
+                        onClose={() => setToast({ show: false, message: '' })}
+                    />
+                </div>
             )}
 
             {/* HEADER */}
@@ -412,7 +460,7 @@ const Films = () => {
                 />
                 <input
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Tìm phim..."
                     className="w-full pl-9 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
@@ -429,6 +477,7 @@ const Films = () => {
                                 <th className="px-4 py-3 text-left w-16">Poster</th>
                                 <th className="px-4 py-3 text-left w-48">Tên phim</th>
                                 <th className="px-4 py-3 text-left">Đạo diễn</th>
+                                <th className="px-4 py-3 text-center">Quốc gia</th>
                                 <th className="px-4 py-3 text-left">Thể loại</th>
                                 <th className="px-4 py-3 text-center">Thời lượng</th>
                                 <th className="px-4 py-3 text-center">Độ tuổi</th>
@@ -453,6 +502,9 @@ const Films = () => {
                                         {item.title}
                                     </td>
                                     <td className="px-4 py-3 text-gray-600">{item.director}</td>
+                                    <td className="px-4 py-3 text-center text-gray-600">
+                                        {item.country}
+                                    </td>
                                     <td className="px-4 py-3 text-gray-600">
                                         {item.genre?.join(', ')}
                                     </td>
@@ -509,7 +561,7 @@ const Films = () => {
                             ))}
                             {paginatedData.length === 0 && (
                                 <tr>
-                                    <td colSpan="11" className="text-center py-6 text-gray-500">
+                                    <td colSpan="12" className="text-center py-6 text-gray-500">
                                         Không tìm thấy phim nào.
                                     </td>
                                 </tr>
@@ -528,9 +580,9 @@ const Films = () => {
                 </div>
             )}
 
-            {/* ==================== MODAL ==================== */}
+            {/* ==================== MODAL FORM ==================== */}
             {openModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100]">
                     <div className="bg-white w-[750px] max-h-[92vh] rounded-2xl flex flex-col shadow-2xl animate-fade-in-up">
                         {/* MODAL HEADER */}
                         <div className="flex justify-between items-center px-6 py-4 border-b bg-gray-50 rounded-t-2xl">
@@ -546,7 +598,7 @@ const Films = () => {
                         </div>
 
                         {/* MODAL BODY */}
-                        <div className="p-6 overflow-y-auto space-y-5">
+                        <div className="p-6 overflow-y-auto space-y-5 custom-scrollbar">
                             <div className="grid grid-cols-2 gap-5">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -572,6 +624,59 @@ const Films = () => {
                                         className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
                                     />
                                 </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Độ tuổi
+                                    </label>
+                                    <input
+                                        placeholder="Ví dụ: C18, 16+, 13..."
+                                        value={form.age_limit}
+                                        onChange={(e) =>
+                                            setForm({ ...form, age_limit: e.target.value })
+                                        }
+                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Thời lượng (Phút)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={form.duration}
+                                        onChange={(e) =>
+                                            setForm({ ...form, duration: e.target.value })
+                                        }
+                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
+                                    />
+                                </div>
+
+                                {/* ===== QUỐC GIA SẢN XUẤT (Dạng Tags chọn nhiều) ===== */}
+                                <div className="col-span-2 p-4 bg-gray-50 rounded-xl border">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Quốc gia sản xuất *
+                                        </label>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {COUNTRIES.map((c) => (
+                                            <button
+                                                key={c}
+                                                type="button"
+                                                onClick={() => toggleCountry(c)}
+                                                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                                                    form.countries.includes(c)
+                                                        ? 'bg-red-600 text-white shadow-md'
+                                                        : 'bg-white text-gray-600 border hover:border-red-300 hover:bg-red-50'
+                                                }`}
+                                            >
+                                                {c}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div className="col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Diễn viên (cách nhau bằng dấu phẩy)
@@ -585,7 +690,7 @@ const Films = () => {
                                     />
                                 </div>
 
-                                {/* ===== GENRE BLOCK ===== */}
+                                {/* ===== THỂ LOẠI PHIM ===== */}
                                 <div className="col-span-2 p-4 bg-gray-50 rounded-xl border">
                                     <div className="flex items-center justify-between mb-3">
                                         <label className="block text-sm font-medium text-gray-700">
@@ -631,7 +736,6 @@ const Films = () => {
                                     {/* ===== GENRE MANAGER PANEL ===== */}
                                     {showGenreManager && (
                                         <div className="mt-4 pt-4 border-t border-dashed space-y-3">
-                                            {/* Add new */}
                                             <div className="flex gap-2">
                                                 <input
                                                     placeholder="Nhập tên thể loại mới..."
@@ -656,7 +760,6 @@ const Films = () => {
                                                 </button>
                                             </div>
 
-                                            {/* Genre list: edit / delete */}
                                             <div className="max-h-32 overflow-y-auto space-y-1 bg-white p-2 rounded-lg border">
                                                 {genres.map((g) => (
                                                     <div
@@ -738,33 +841,6 @@ const Films = () => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Độ tuổi
-                                    </label>
-                                    <input
-                                        placeholder="Ví dụ: C18, 16+, 13..."
-                                        value={form.age_limit}
-                                        onChange={(e) =>
-                                            setForm({ ...form, age_limit: e.target.value })
-                                        }
-                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Thời lượng (Phút)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={form.duration}
-                                        onChange={(e) =>
-                                            setForm({ ...form, duration: e.target.value })
-                                        }
-                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Ngày chiếu
                                     </label>
                                     <input
@@ -788,23 +864,6 @@ const Films = () => {
                                         }
                                         className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 bg-white"
                                     />
-                                </div>
-
-                                <div className="col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Trạng thái phim
-                                    </label>
-                                    <select
-                                        value={form.status}
-                                        onChange={(e) =>
-                                            setForm({ ...form, status: e.target.value })
-                                        }
-                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 bg-white"
-                                    >
-                                        <option value="showing">Đang chiếu</option>
-                                        <option value="upcoming">Sắp chiếu</option>
-                                        <option value="expired">Ngừng chiếu</option>
-                                    </select>
                                 </div>
 
                                 <div className="col-span-2">
@@ -884,7 +943,7 @@ const Films = () => {
 
             {/* ==================== CONFIRM DIALOG ==================== */}
             {confirm.show && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[110]">
                     <div className="bg-white rounded-2xl shadow-2xl w-[380px] overflow-hidden animate-scale-in">
                         <div className="flex flex-col items-center pt-8 pb-5 px-6">
                             <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-5">

@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCinema } from '../../components/CinemaContext'; // Lấy Context vào
+import RevealOnScroll from '../../components/common/RevealOnScroll'; // Nhớ import
 
 const DAY_NAMES = ['CN', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
@@ -41,7 +42,6 @@ const MovieDetail = () => {
 
     // ================= ĐỒNG BỘ LOCAL STATE VỚI GLOBAL STATE =================
     useEffect(() => {
-        // Nếu trên Header (Global) có chọn rạp, tự động ép local state đổi theo
         if (globalCinema && globalCinema.cinema_id) {
             const city = globalCinema.region?.city || globalCinema.city;
             if (city) {
@@ -75,8 +75,20 @@ const MovieDetail = () => {
                     'https://cinema-api-production-f2bc.up.railway.app/api/v1/movies'
                 );
                 const json = await res.json();
-                const allMovies = [...(json?.now_showing || []), ...(json?.coming_soon || [])];
-                const found = allMovies.find((m) => m.movie_id === Number(id));
+
+                // Phân loại mảng để biết phim này Đang chiếu hay Sắp chiếu
+                const nowShowing = json?.now_showing || [];
+                const comingSoon = json?.coming_soon || [];
+
+                let found = nowShowing.find((m) => m.movie_id === Number(id));
+                let isUpcoming = false;
+
+                if (!found) {
+                    found = comingSoon.find((m) => m.movie_id === Number(id));
+                    if (found) {
+                        isUpcoming = true; // Đánh dấu đây là phim sắp chiếu
+                    }
+                }
 
                 if (!found) {
                     setMovie(null);
@@ -104,7 +116,8 @@ const MovieDetail = () => {
                             ? found.actors.split(',')
                             : found.actors
                         : [],
-                    genre: Array.isArray(found.genres) ? found.genres.map((g) => g.genre_name) : []
+                    genre: Array.isArray(found.genres) ? found.genres.map((g) => g.genre_name) : [],
+                    is_upcoming: isUpcoming // Lưu cờ is_upcoming
                 });
             } catch (err) {
                 console.error(err);
@@ -317,7 +330,9 @@ const MovieDetail = () => {
             </div>
 
             {/* ================= DESCRIPTION ================= */}
-            <div className="max-w-6xl mx-auto px-6 py-12 border-b border-zinc-800/80">
+            <div
+                className={`max-w-6xl mx-auto px-6 py-12 ${movie.is_upcoming ? 'pb-24' : 'border-b border-zinc-800/80'}`}
+            >
                 <div className="flex items-center gap-3 mb-6">
                     <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]"></div>
                     <h2 className="text-2xl font-bold uppercase tracking-widest">Nội dung phim</h2>
@@ -327,213 +342,247 @@ const MovieDetail = () => {
                 </p>
             </div>
 
-            {/* ================= LỊCH CHIẾU (ĐÃ TÍCH HỢP GLOBAL STATE) ================= */}
-            <div className="max-w-6xl mx-auto px-6 py-12">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]"></div>
-                    <h2 className="text-2xl font-bold uppercase tracking-widest">Lịch Chiếu</h2>
-                </div>
-
-                <div className="flex flex-col md:flex-row items-center gap-4 flex-wrap mb-10">
-                    {/* Date slider */}
-                    <div className="flex items-center bg-zinc-900/80 p-1.5 rounded-2xl border border-white/5 flex-shrink-0">
-                        <button
-                            onClick={() => {
-                                setDateOffset(Math.max(0, dateOffset - 5));
-                                setSelectedDate(0);
-                            }}
-                            className="text-zinc-500 hover:text-white text-2xl px-3 h-14 transition-colors"
-                        >
-                            ‹
-                        </button>
-                        <div className="flex gap-1">
-                            {dates.map((d, i) => {
-                                const isToday = i === 0 && dateOffset === 0;
-                                const active = i === selectedDate;
-                                return (
-                                    <div
-                                        key={i}
-                                        onClick={() => setSelectedDate(i)}
-                                        className={`flex flex-col items-center justify-center w-[75px] h-[56px] cursor-pointer rounded-xl transition-all select-none
-                                            ${active ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
-                                    >
-                                        <span className="text-[10px] font-medium uppercase tracking-wider">
-                                            {isToday ? 'Hôm Nay' : DAY_NAMES[d.getDay()]}
-                                        </span>
-                                        <span className="text-lg font-bold">{formatDate(d)}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <button
-                            onClick={() => {
-                                setDateOffset(dateOffset + 5);
-                                setSelectedDate(0);
-                            }}
-                            className="text-zinc-500 hover:text-white text-2xl px-3 h-14 transition-colors"
-                        >
-                            ›
-                        </button>
-                    </div>
-
-                    {/* Region dropdown */}
-                    <div className="relative">
-                        <div
-                            onClick={() => {
-                                setIsOpenRegion(!isOpenRegion);
-                                setIsOpenCinema(false);
-                            }}
-                            className={`bg-zinc-900/80 backdrop-blur-xl border px-5 py-3.5 rounded-2xl cursor-pointer flex items-center justify-between gap-8 min-w-[200px] text-sm font-medium transition-colors
-                                ${isOpenRegion ? 'border-red-500 text-white' : 'border-white/5 hover:border-white/20 text-zinc-300'}`}
-                        >
-                            <span>{selectedRegion.name}</span>
-                            <span
-                                className={`text-zinc-500 text-[10px] transition-transform duration-300 ${isOpenRegion ? 'rotate-180' : ''}`}
-                            >
-                                ▼
-                            </span>
-                        </div>
-
-                        {isOpenRegion && (
-                            <div className="absolute top-full mt-2 w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl z-50 shadow-2xl overflow-hidden py-2">
-                                {regions.map((r) => (
-                                    <div
-                                        key={r.id}
-                                        onClick={() => {
-                                            setSelectedRegion(r);
-                                            setSelectedCinema({ id: 'ALL', name: 'Tất cả rạp' });
-                                            setIsOpenRegion(false);
-                                            // Xóa lựa chọn rạp global nếu đổi thành phố
-                                            changeCinema(null);
-                                        }}
-                                        className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
-                                            ${selectedRegion.id === r.id ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        {r.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Cinema dropdown (Sync with global context) */}
-                    <div className="relative">
-                        <div
-                            onClick={() => {
-                                setIsOpenCinema(!isOpenCinema);
-                                setIsOpenRegion(false);
-                            }}
-                            className={`bg-zinc-900/80 backdrop-blur-xl border px-5 py-3.5 rounded-2xl cursor-pointer flex items-center justify-between gap-8 min-w-[220px] text-sm font-medium transition-colors
-                                ${isOpenCinema ? 'border-red-500 text-white' : 'border-white/5 hover:border-white/20 text-zinc-300'}`}
-                        >
-                            <span className="truncate max-w-[150px]">{selectedCinema.name}</span>
-                            <span
-                                className={`text-zinc-500 text-[10px] transition-transform duration-300 ${isOpenCinema ? 'rotate-180' : ''}`}
-                            >
-                                ▼
-                            </span>
-                        </div>
-
-                        {isOpenCinema && (
-                            <div className="absolute top-full mt-2 w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl z-50 shadow-2xl overflow-hidden max-h-64 overflow-y-auto py-2 custom-scrollbar">
-                                <div
-                                    onClick={() => {
-                                        setSelectedCinema({ id: 'ALL', name: 'Tất cả rạp' });
-                                        setIsOpenCinema(false);
-                                        changeCinema(null); // Reset global state
-                                    }}
-                                    className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
-                                        ${selectedCinema.id === 'ALL' ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
-                                >
-                                    Tất cả rạp
-                                </div>
-                                {filteredCinemas.map((c) => (
-                                    <div
-                                        key={c.id}
-                                        onClick={() => {
-                                            setSelectedCinema(c);
-                                            setIsOpenCinema(false);
-                                            // Đồng bộ ngược lại cho Header (Global State)
-                                            changeCinema({
-                                                cinema_id: c.id,
-                                                cinema_name: c.name,
-                                                region: { city: c.city }
-                                            });
-                                        }}
-                                        className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl truncate
-                                            ${selectedCinema.id === c.id ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        {c.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+            {/* ================= ĐIỀU KIỆN HIỂN THỊ LỊCH CHIẾU ================= */}
+            {movie.is_upcoming ? (
+                // NẾU LÀ PHIM SẮP CHIẾU -> HIỂN THỊ THÔNG BÁO ĐẸP MẮT VÀ ẨN LỊCH CHIẾU
+                <div className="max-w-4xl mx-auto px-6 pb-24 pt-8 text-center">
+                    <div className="bg-zinc-900/80 border border-white/5 rounded-2xl p-10 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                        <span className="text-5xl mb-4">🚀</span>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-3">
+                            Phim Sắp Ra Mắt
+                        </h2>
+                        <p className="text-zinc-400 text-base max-w-lg">
+                            Bom tấn này hiện chưa chính thức khởi chiếu tại các cụm rạp. Hãy quay
+                            lại vào ngày{' '}
+                            <strong className="text-red-400">{movie.release_date}</strong> để đặt vé
+                            nhé!
+                        </p>
                     </div>
                 </div>
-
-                <div className="h-[1px] w-full bg-zinc-800 mb-8 rounded" />
-
-                {/* ===== SHOWTIME LIST ===== */}
-                <div className="flex flex-col gap-5">
-                    {displayedCinemas.length === 0 ? (
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl py-12 text-center">
-                            <p className="text-zinc-500 font-medium">
-                                Không có suất chiếu nào phù hợp với lựa chọn của bạn.
-                            </p>
+            ) : (
+                // NẾU LÀ PHIM ĐANG CHIẾU -> HIỂN THỊ CHỌN RẠP & SUẤT CHIẾU BÌNH THƯỜNG
+                <div className="max-w-6xl mx-auto px-6 py-12">
+                    <RevealOnScroll delay={50}>
+                        <div className="flex items-center gap-3 mb-8">
+                            <div className="w-1.5 h-6 bg-red-600 rounded-full shadow-[0_0_10px_rgba(220,38,38,0.5)]"></div>
+                            <h2 className="text-2xl font-bold uppercase tracking-widest">
+                                Lịch Chiếu
+                            </h2>
                         </div>
-                    ) : (
-                        displayedCinemas.map((c) => (
-                            <div
-                                key={c.id}
-                                className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/5 shadow-lg transition-all hover:border-white/10"
+                    </RevealOnScroll>
+
+                    {/* THÊM relative z-50 Ở ĐÂY ĐỂ DROPDOWN LUÔN NỔI LÊN TRÊN */}
+                    <RevealOnScroll
+                        className="relative z-40 flex flex-col md:flex-row items-center gap-4 flex-wrap mb-10"
+                        delay={150}
+                    >
+                        {/* Date slider */}
+                        <div className="flex items-center bg-zinc-900/80 p-1.5 rounded-2xl border border-white/5 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    setDateOffset(Math.max(0, dateOffset - 5));
+                                    setSelectedDate(0);
+                                }}
+                                className="text-zinc-500 hover:text-white text-2xl px-3 h-14 transition-colors"
                             >
-                                <div className="px-6 py-5 border-b border-white/5 bg-black/20 flex flex-col md:flex-row justify-between md:items-center gap-3">
-                                    <div>
-                                        <p className="font-bold text-lg text-white tracking-wide">
-                                            {c.name}
-                                        </p>
-                                        {c.address && (
-                                            <p className="text-sm text-zinc-500 mt-1 flex items-center gap-1.5">
-                                                <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    className="h-4 w-4 text-red-500"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fillRule="evenodd"
-                                                        d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                                                        clipRule="evenodd"
-                                                    />
-                                                </svg>
-                                                {c.address}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="px-6 py-6 flex flex-wrap gap-4">
-                                    {(showtimes[c.id] || []).map((slot) => (
-                                        <button
-                                            key={slot}
-                                            disabled={isSoldSlot(slot)}
-                                            className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300
-                                                ${
-                                                    isSoldSlot(slot)
-                                                        ? 'border-white/5 bg-white/5 text-zinc-600 line-through cursor-not-allowed'
-                                                        : isVipSlot(slot)
-                                                          ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
-                                                          : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
-                                                }`}
+                                ‹
+                            </button>
+                            <div className="flex gap-1">
+                                {dates.map((d, i) => {
+                                    const isToday = i === 0 && dateOffset === 0;
+                                    const active = i === selectedDate;
+                                    return (
+                                        <div
+                                            key={i}
+                                            onClick={() => setSelectedDate(i)}
+                                            className={`flex flex-col items-center justify-center w-[75px] h-[56px] cursor-pointer rounded-xl transition-all select-none
+                                                ${active ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
                                         >
-                                            {slot}
-                                        </button>
+                                            <span className="text-[10px] font-medium uppercase tracking-wider">
+                                                {isToday ? 'Hôm Nay' : DAY_NAMES[d.getDay()]}
+                                            </span>
+                                            <span className="text-lg font-bold">
+                                                {formatDate(d)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setDateOffset(dateOffset + 5);
+                                    setSelectedDate(0);
+                                }}
+                                className="text-zinc-500 hover:text-white text-2xl px-3 h-14 transition-colors"
+                            >
+                                ›
+                            </button>
+                        </div>
+
+                        {/* Region dropdown */}
+                        <div className="relative">
+                            <div
+                                onClick={() => {
+                                    setIsOpenRegion(!isOpenRegion);
+                                    setIsOpenCinema(false);
+                                }}
+                                className={`bg-zinc-900/80 backdrop-blur-xl border px-5 py-3.5 rounded-2xl cursor-pointer flex items-center justify-between gap-8 min-w-[200px] text-sm font-medium transition-colors
+                                    ${isOpenRegion ? 'border-red-500 text-white' : 'border-white/5 hover:border-white/20 text-zinc-300'}`}
+                            >
+                                <span>{selectedRegion.name}</span>
+                                <span
+                                    className={`text-zinc-500 text-[10px] transition-transform duration-300 ${isOpenRegion ? 'rotate-180' : ''}`}
+                                >
+                                    ▼
+                                </span>
+                            </div>
+
+                            {isOpenRegion && (
+                                <div className="absolute top-full mt-2 w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl z-50 shadow-2xl overflow-hidden py-2">
+                                    {regions.map((r) => (
+                                        <div
+                                            key={r.id}
+                                            onClick={() => {
+                                                setSelectedRegion(r);
+                                                setSelectedCinema({
+                                                    id: 'ALL',
+                                                    name: 'Tất cả rạp'
+                                                });
+                                                setIsOpenRegion(false);
+                                                changeCinema(null); // Xóa lựa chọn rạp global nếu đổi thành phố
+                                            }}
+                                            className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
+                                                ${selectedRegion.id === r.id ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
+                                        >
+                                            {r.name}
+                                        </div>
                                     ))}
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Cinema dropdown */}
+                        <div className="relative">
+                            <div
+                                onClick={() => {
+                                    setIsOpenCinema(!isOpenCinema);
+                                    setIsOpenRegion(false);
+                                }}
+                                className={`bg-zinc-900/80 backdrop-blur-xl border px-5 py-3.5 rounded-2xl cursor-pointer flex items-center justify-between gap-8 min-w-[220px] text-sm font-medium transition-colors
+                                    ${isOpenCinema ? 'border-red-500 text-white' : 'border-white/5 hover:border-white/20 text-zinc-300'}`}
+                            >
+                                <span className="truncate max-w-[150px]">
+                                    {selectedCinema.name}
+                                </span>
+                                <span
+                                    className={`text-zinc-500 text-[10px] transition-transform duration-300 ${isOpenCinema ? 'rotate-180' : ''}`}
+                                >
+                                    ▼
+                                </span>
                             </div>
-                        ))
-                    )}
+
+                            {isOpenCinema && (
+                                <div className="absolute top-full mt-2 w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl z-50 shadow-2xl overflow-hidden max-h-64 overflow-y-auto py-2 custom-scrollbar">
+                                    <div
+                                        onClick={() => {
+                                            setSelectedCinema({ id: 'ALL', name: 'Tất cả rạp' });
+                                            setIsOpenCinema(false);
+                                            changeCinema(null); // Reset global state
+                                        }}
+                                        className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
+                                            ${selectedCinema.id === 'ALL' ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        Tất cả rạp
+                                    </div>
+                                    {filteredCinemas.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            onClick={() => {
+                                                setSelectedCinema(c);
+                                                setIsOpenCinema(false);
+                                                // Đồng bộ ngược lại cho Header (Global State)
+                                                changeCinema({
+                                                    cinema_id: c.id,
+                                                    cinema_name: c.name,
+                                                    region: { city: c.city }
+                                                });
+                                            }}
+                                            className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl truncate
+                                                ${selectedCinema.id === c.id ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
+                                        >
+                                            {c.name}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </RevealOnScroll>
+
+                    <div className="h-[1px] w-full bg-zinc-800 mb-8 rounded" />
+
+                    {/* ===== SHOWTIME LIST ===== */}
+                    {/* THÊM relative z-10 Ở ĐÂY ĐỂ NÓ NẰM DƯỚI DROPDOWN CỦA BỘ LỌC */}
+                    <div className="relative z-10 flex flex-col gap-5">
+                        {displayedCinemas.length === 0 ? (
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl py-12 text-center">
+                                <p className="text-zinc-500 font-medium">
+                                    Không có suất chiếu nào phù hợp với lựa chọn của bạn.
+                                </p>
+                            </div>
+                        ) : (
+                            displayedCinemas.map((c, index) => (
+                                <RevealOnScroll key={c.id} delay={index * 100}>
+                                    <div className="bg-zinc-900/60 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/5 shadow-lg transition-all hover:border-white/10">
+                                        <div className="px-6 py-5 border-b border-white/5 bg-black/20 flex flex-col md:flex-row justify-between md:items-center gap-3">
+                                            <div>
+                                                <p className="font-bold text-lg text-white tracking-wide">
+                                                    {c.name}
+                                                </p>
+                                                {c.address && (
+                                                    <p className="text-sm text-zinc-500 mt-1 flex items-center gap-1.5">
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            className="h-4 w-4 text-red-500"
+                                                            viewBox="0 0 20 20"
+                                                            fill="currentColor"
+                                                        >
+                                                            <path
+                                                                fillRule="evenodd"
+                                                                d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                                                clipRule="evenodd"
+                                                            />
+                                                        </svg>
+                                                        {c.address}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="px-6 py-6 flex flex-wrap gap-4">
+                                            {(showtimes[c.id] || []).map((slot) => (
+                                                <button
+                                                    key={slot}
+                                                    disabled={isSoldSlot(slot)}
+                                                    className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300
+                                                        ${
+                                                            isSoldSlot(slot)
+                                                                ? 'border-white/5 bg-white/5 text-zinc-600 line-through cursor-not-allowed'
+                                                                : isVipSlot(slot)
+                                                                  ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
+                                                                  : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
+                                                        }`}
+                                                >
+                                                    {slot}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </RevealOnScroll>
+                            ))
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ================= TRAILER MODAL ================= */}
             {openTrailer && (

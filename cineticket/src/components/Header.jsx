@@ -8,7 +8,6 @@ const Header = () => {
 
     const handleSelectCinema = (cinema) => {
         changeCinema(cinema);
-        // Optional: Có thể thêm thông báo hoặc tự động đóng menu ở đây nếu muốn
     };
 
     const location = useLocation();
@@ -23,6 +22,9 @@ const Header = () => {
     });
 
     const [scrolled, setScrolled] = useState(false);
+
+    // Dùng để điều khiển Tab Thành phố đang được active trong bảng chọn rạp
+    const [activeCityTab, setActiveCityTab] = useState(null);
 
     const loadUser = () => {
         const user = localStorage.getItem('currentUser');
@@ -84,6 +86,13 @@ const Header = () => {
         loadUser();
     }, [location.pathname]);
 
+    // Đồng bộ tab thành phố với lựa chọn hiện tại để khi mở menu lên nó focus đúng chỗ
+    useEffect(() => {
+        if (selectedRegion && selectedRegion !== 'Đang tải...' && !activeCityTab) {
+            setActiveCityTab(selectedRegion);
+        }
+    }, [selectedRegion, activeCityTab]);
+
     const isActive = (path) => location.pathname === path;
 
     const handleLogout = () => {
@@ -95,15 +104,19 @@ const Header = () => {
 
     const handleSelectRegion = (city) => {
         setSelectedRegion(city);
+        setActiveCityTab(city);
         localStorage.setItem('selectedRegion', city);
     };
+
+    // Xác định thành phố đang được hiển thị trong bảng Menu
+    const displayCity = activeCityTab || selectedRegion || Object.keys(cinemasByCity)[0];
 
     return (
         <header
             className={`fixed top-0 w-full z-50 transition-all duration-300 border-b ${
                 scrolled
-                    ? 'bg-zinc-950/80 backdrop-blur-xl border-white/5 shadow-lg shadow-black/50 py-0'
-                    : 'bg-gradient-to-b from-zinc-950/90 to-transparent border-transparent py-2'
+                    ? 'bg-zinc-950/85 backdrop-blur-xl border-white/5 shadow-lg shadow-black/50 py-0'
+                    : 'bg-gradient-to-b from-zinc-950/95 to-transparent border-transparent py-2'
             }`}
         >
             <div className="max-w-7xl mx-auto px-4 md:px-6">
@@ -131,7 +144,7 @@ const Header = () => {
                         </div>
                     </div>
 
-                    {/* MENU */}
+                    {/* MENU DESKTOP */}
                     <nav className="hidden lg:flex items-center gap-2 text-[14px] font-semibold">
                         {[
                             { path: '/movies', label: 'Phim' },
@@ -144,7 +157,7 @@ const Header = () => {
                                 to={item.path}
                                 className={`relative px-4 py-2 rounded-full transition-all duration-300 uppercase tracking-wide whitespace-nowrap ${
                                     isActive(item.path)
-                                        ? 'text-white bg-white/10'
+                                        ? 'text-white bg-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]'
                                         : 'text-zinc-400 hover:text-white hover:bg-white/5'
                                 }`}
                             >
@@ -188,95 +201,116 @@ const Header = () => {
 
                     {/* RIGHT SIDE: REGION + USER */}
                     <div className="flex items-center gap-6 flex-shrink-0">
-                        {/* ======================= REGION SELECTOR ======================= */}
-                        <div className="hidden md:block relative group cursor-pointer">
-                            <div className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors duration-200 py-4">
+                        {/* ======================= REGION SELECTOR (DESKTOP - KIỂU TAB MEGA MENU) ======================= */}
+                        <div className="hidden md:block relative group cursor-pointer z-50">
+                            {/* Trigger Button */}
+                            <div className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors duration-200 py-4">
+                                <div className="p-1.5 bg-red-500/10 rounded-full text-red-500">
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="w-4 h-4"
+                                        viewBox="0 0 24 24"
+                                        fill="currentColor"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
+                                            clipRule="evenodd"
+                                        />
+                                    </svg>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500 leading-none mb-0.5">
+                                        Hệ thống rạp
+                                    </span>
+                                    <span className="text-sm font-bold whitespace-nowrap text-white max-w-[130px] truncate">
+                                        {selectedCinema
+                                            ? selectedCinema.cinema_name
+                                            : selectedRegion}
+                                    </span>
+                                </div>
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
-                                    className="w-5 h-5 text-red-500"
+                                    className="w-3.5 h-3.5 ml-1 transition-transform duration-300 group-hover:-rotate-180 text-zinc-500"
+                                    fill="none"
                                     viewBox="0 0 24 24"
-                                    fill="currentColor"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
                                 >
                                     <path
-                                        fillRule="evenodd"
-                                        d="M11.54 22.351l.07.04.028.016a.76.76 0 00.723 0l.028-.015.071-.041a16.975 16.975 0 001.144-.742 19.58 19.58 0 002.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 00-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 002.682 2.282 16.975 16.975 0 001.145.742zM12 13.5a3 3 0 100-6 3 3 0 000 6z"
-                                        clipRule="evenodd"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M19 9l-7 7-7-7"
                                     />
                                 </svg>
-                                <span className="text-sm font-semibold whitespace-nowrap">
-                                    {/* Nếu đã chọn rạp thì hiện tên rạp, chưa chọn thì hiện Tỉnh/Thành phố */}
-                                    {selectedCinema ? selectedCinema.cinema_name : selectedRegion}
-                                </span>
                             </div>
 
-                            {/* MENU CẤP 1 (Danh sách Thành phố) */}
-                            <div className="absolute top-[80%] right-0 w-60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out z-50 pt-4">
-                                <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-2">
-                                    <div className="px-4 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
-                                        Tỉnh / Thành phố
-                                    </div>
-                                    {Object.keys(cinemasByCity).map((city) => (
-                                        <div key={city} className="relative group/city">
+                            {/* Bảng Dropdown kiểu Tabs */}
+                            <div className="absolute top-[85%] right-0 w-[420px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out pt-3 origin-top-right">
+                                <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                                    {/* Tab Thành phố (Cuộn ngang) */}
+                                    <div className="bg-black/40 border-b border-white/5 px-2 py-2 flex gap-1 overflow-x-auto custom-scrollbar">
+                                        {Object.keys(cinemasByCity).map((city) => (
                                             <div
-                                                onClick={() => handleSelectRegion(city)}
-                                                className={`px-4 py-3 text-sm font-medium rounded-xl flex items-center justify-between transition-colors
-                        ${selectedRegion === city ? 'bg-red-500/10 text-red-400' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
+                                                key={city}
+                                                onMouseEnter={() => setActiveCityTab(city)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer transition-all duration-200
+                                                    ${displayCity === city ? 'bg-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'text-zinc-400 hover:text-white hover:bg-white/10'}`}
                                             >
                                                 {city}
-                                                <svg
-                                                    className="w-3 h-3 opacity-50"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    viewBox="0 0 24 24"
-                                                >
-                                                    <path
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        strokeWidth="3"
-                                                        d="M9 5l7 7-7 7"
-                                                    />
-                                                </svg>
                                             </div>
+                                        ))}
+                                    </div>
 
-                                            {/* MENU CẤP 2 (Danh sách Rạp) */}
-                                            <div className="absolute top-0 right-[100%] mr-2 w-64 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-2 opacity-0 invisible group-hover/city:opacity-100 group-hover/city:visible transition-all duration-300">
-                                                <div className="px-3 py-2 text-[10px] font-bold text-red-500 uppercase border-b border-white/5 mb-1">
-                                                    Rạp tại {city}
+                                    {/* Danh sách rạp theo Tab Thành phố đang chọn */}
+                                    <div className="p-3 max-h-[300px] overflow-y-auto custom-scrollbar flex flex-col gap-1.5">
+                                        {cinemasByCity[displayCity]?.map((cinema) => {
+                                            const isSelected =
+                                                selectedCinema?.cinema_id === cinema.cinema_id;
+                                            return (
+                                                <div
+                                                    key={cinema.cinema_id}
+                                                    onClick={() => {
+                                                        handleSelectCinema(cinema);
+                                                        handleSelectRegion(displayCity);
+                                                    }}
+                                                    className={`px-4 py-3 rounded-xl text-sm font-medium cursor-pointer transition-all duration-200 flex items-center justify-between group/item
+                                                        ${isSelected ? 'bg-red-500/10 border border-red-500/30 text-red-400' : 'bg-white/5 border border-transparent hover:bg-white/10 hover:border-white/10 text-zinc-300 hover:text-white'}`}
+                                                >
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span>{cinema.cinema_name}</span>
+                                                        {/* Có thể bổ sung địa chỉ rạp ở đây nếu data có */}
+                                                        {cinema.address && (
+                                                            <span className="text-[10px] text-zinc-500 font-normal truncate max-w-[280px]">
+                                                                {cinema.address}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {isSelected && (
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            className="w-4 h-4 text-red-500 shadow-sm"
+                                                            viewBox="0 0 20 20"
+                                                            fill="currentColor"
+                                                        >
+                                                            <path
+                                                                fillRule="evenodd"
+                                                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                                clipRule="evenodd"
+                                                            />
+                                                        </svg>
+                                                    )}
                                                 </div>
-                                                <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
-                                                    {cinemasByCity[city].map((cinema) => {
-                                                        // Kiểm tra rạp này có đang được chọn không
-                                                        const isSelected =
-                                                            selectedCinema?.cinema_id ===
-                                                            cinema.cinema_id;
-                                                        return (
-                                                            <div
-                                                                key={cinema.cinema_id}
-                                                                // THÊM SỰ KIỆN ONCLICK Ở ĐÂY
-                                                                onClick={() =>
-                                                                    handleSelectCinema(cinema)
-                                                                }
-                                                                className={`px-3 py-2.5 text-sm rounded-lg cursor-pointer transition-colors ${
-                                                                    isSelected
-                                                                        ? 'bg-red-500/20 text-red-500 font-bold' // Highlight nếu được chọn
-                                                                        : 'text-zinc-300 hover:text-white hover:bg-white/10'
-                                                                }`}
-                                                            >
-                                                                {cinema.cinema_name}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* USER AREA */}
                         {currentUser ? (
-                            <div className="relative group cursor-pointer py-4">
+                            <div className="relative group cursor-pointer py-4 z-40">
                                 <div className="flex items-center gap-3 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full transition-colors border border-white/5">
                                     <div className="w-8 h-8 flex-shrink-0 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-[0_0_10px_rgba(220,38,38,0.4)]">
                                         {currentUser.full_name?.charAt(0).toUpperCase()}
@@ -288,7 +322,7 @@ const Header = () => {
                                     </div>
                                 </div>
 
-                                <div className="absolute top-[80%] right-0 w-60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out z-50 transform origin-top-right group-hover:translate-y-0 translate-y-4 pt-4">
+                                <div className="absolute top-[80%] right-0 w-60 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out transform origin-top-right group-hover:translate-y-0 translate-y-4 pt-4">
                                     <div className="bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col">
                                         <div className="px-3 py-3 border-b border-white/5 mb-2 flex items-center gap-3">
                                             <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-rose-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -306,6 +340,7 @@ const Header = () => {
 
                                         <Link
                                             to="/profile"
+                                            state={{ targetTab: 'Thông Tin Cá Nhân' }}
                                             className="px-3 py-2.5 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3"
                                         >
                                             <svg
@@ -326,7 +361,8 @@ const Header = () => {
                                         </Link>
 
                                         <Link
-                                            to="/history"
+                                            to="/profile"
+                                            state={{ targetTab: 'Lịch Sử Giao Dịch' }}
                                             className="px-3 py-2.5 text-sm font-medium text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center gap-3"
                                         >
                                             <svg
@@ -399,37 +435,92 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* Mobile Menu (Responsive) */}
+            {/* ======================= MOBILE MENU (RESPONSIVE - TAB KIỂU MỚI) ======================= */}
             <div
-                className={`lg:hidden overflow-hidden transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+                className={`lg:hidden overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${
+                    isMenuOpen
+                        ? 'max-h-[85vh] opacity-100 border-b border-white/10'
+                        : 'max-h-0 opacity-0'
+                }`}
             >
-                <div className="bg-zinc-950/95 backdrop-blur-xl border-t border-white/5 px-4 py-6 flex flex-col gap-5 shadow-2xl">
-                    <div className="flex flex-col gap-2 text-[15px] font-semibold">
+                <div className="bg-zinc-950/95 backdrop-blur-2xl px-4 py-6 flex flex-col gap-6 shadow-2xl">
+                    {/* Menu links cơ bản */}
+                    <div className="flex flex-col gap-2 text-[15px] font-semibold border-b border-white/5 pb-4">
                         {['Phim', 'Lịch chiếu', 'Rạp', 'Giá vé'].map((item, idx) => (
                             <Link
                                 key={idx}
                                 to={item === 'Phim' ? '/movies' : '#'}
+                                onClick={() => setIsMenuOpen(false)}
                                 className="text-zinc-300 hover:text-white hover:bg-white/5 px-4 py-3 rounded-xl transition-colors"
                             >
                                 {item}
                             </Link>
                         ))}
+                    </div>
 
-                        <div className="mt-4 px-4">
-                            <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-2">
-                                Khu vực
+                    {/* KHU VỰC VÀ RẠP (MOBILE TAB / PILLS) */}
+                    <div className="px-2">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-1.5 h-4 bg-red-600 rounded-full"></div>
+                            <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">
+                                Chọn Rạp Phim
                             </p>
-                            <select
-                                value={selectedRegion}
-                                onChange={(e) => handleSelectRegion(e.target.value)}
-                                className="w-full bg-black/40 text-white border border-white/10 rounded-xl p-3 focus:outline-none focus:border-red-500 appearance-none"
-                            >
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            {/* Thanh cuộn ngang chọn Thành phố */}
+                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
                                 {Object.keys(cinemasByCity).map((city) => (
-                                    <option key={city} value={city} className="bg-zinc-900">
+                                    <button
+                                        key={city}
+                                        onClick={() => handleSelectRegion(city)}
+                                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 border
+                                            ${displayCity === city ? 'bg-red-600 text-white border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'bg-transparent text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'}`}
+                                    >
                                         {city}
-                                    </option>
+                                    </button>
                                 ))}
-                            </select>
+                            </div>
+
+                            {/* Danh sách rạp hiển thị theo thành phố đã chọn */}
+                            <div className="flex flex-col gap-2 bg-black/20 p-2 rounded-2xl border border-white/5 max-h-[40vh] overflow-y-auto custom-scrollbar">
+                                {cinemasByCity[displayCity]?.map((cinema) => {
+                                    const isSelected =
+                                        selectedCinema?.cinema_id === cinema.cinema_id;
+                                    return (
+                                        <button
+                                            key={cinema.cinema_id}
+                                            onClick={() => {
+                                                handleSelectCinema(cinema);
+                                                handleSelectRegion(displayCity);
+                                                setIsMenuOpen(false); // Chọn xong tự đóng menu
+                                            }}
+                                            className={`text-left px-4 py-3.5 text-sm rounded-xl font-medium transition-all duration-200 flex items-center justify-between
+                                                ${
+                                                    isSelected
+                                                        ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                                                        : 'bg-white/5 border border-transparent text-zinc-300 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                        >
+                                            <span className="truncate">{cinema.cinema_name}</span>
+                                            {isSelected && (
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4 text-red-500 flex-shrink-0 ml-2"
+                                                    viewBox="0 0 20 20"
+                                                    fill="currentColor"
+                                                >
+                                                    <path
+                                                        fillRule="evenodd"
+                                                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                        clipRule="evenodd"
+                                                    />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>

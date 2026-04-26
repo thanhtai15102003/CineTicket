@@ -253,7 +253,7 @@ const AdminLayout = ({ children }) => {
                 </header>
 
                 {/* ===== CONTENT AREA ===== */}
-                <div className="p-8 max-w-screen-2xl mx-auto relative z-0">{children}</div>
+                <div className="p-8 max-w-screen-2xl mx-auto z-0">{children}</div>
             </main>
         </div>
     );

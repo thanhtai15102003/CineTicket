@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreateRoomModal } from './CreateRoomModal';
 import Toast from '../../components/common/Toast';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Pagination from '../../components/common/Pagination'; // <-- THÊM IMPORT NÀY
 
 export default function Rooms() {
     const navigate = useNavigate();
@@ -17,6 +18,10 @@ export default function Rooms() {
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState({ show: false, message: '' });
     const [confirmDelete, setConfirmDelete] = useState({ show: false, id: null });
+
+    // State phân trang
+    const [page, setPage] = useState(1);
+    const ITEMS_PER_PAGE = 5;
 
     const showToast = (message) => setToast({ show: true, message });
     const getToken = () => localStorage.getItem('token');
@@ -57,6 +62,11 @@ export default function Rooms() {
     useEffect(() => {
         fetchRooms();
     }, []);
+
+    // Reset về trang 1 khi thay đổi tìm kiếm hoặc chuyển tab
+    useEffect(() => {
+        setPage(1);
+    }, [search, tab]);
 
     // ================== TOGGLE STATUS ==================
     const toggleStatus = async (room) => {
@@ -123,7 +133,7 @@ export default function Rooms() {
         }
     };
 
-    // ================== FILTERING ==================
+    // ================== FILTERING & PAGINATION ==================
     const filteredRooms = rooms.filter((room) => {
         const matchSearch = room.room_name?.toLowerCase().includes(search.toLowerCase());
         const matchTab =
@@ -133,6 +143,17 @@ export default function Rooms() {
 
         return matchSearch && matchTab;
     });
+
+    const totalPages = Math.ceil(filteredRooms.length / ITEMS_PER_PAGE);
+
+    // Chống kẹt trang khi xóa phần tử cuối cùng của trang
+    useEffect(() => {
+        if (page > totalPages && totalPages > 0) {
+            setPage(totalPages);
+        }
+    }, [totalPages, page]);
+
+    const pagedRooms = filteredRooms.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     return (
         <div className="p-6 bg-gray-100 min-h-screen text-gray-800">
@@ -189,11 +210,9 @@ export default function Rooms() {
                 </div>
             </div>
 
-            {/* Table */}
-            {loading ? (
-                <LoadingSpinner />
-            ) : (
-                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            {/* Table Container */}
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden flex flex-col">
+                <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-gray-50 text-sm font-medium text-gray-500 border-b">
                             <tr>
@@ -207,8 +226,14 @@ export default function Rooms() {
                         </thead>
 
                         <tbody className="divide-y divide-gray-100">
-                            {filteredRooms.length > 0 ? (
-                                filteredRooms.map((room) => (
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="6" className="text-center p-8">
+                                        <LoadingSpinner />
+                                    </td>
+                                </tr>
+                            ) : pagedRooms.length > 0 ? (
+                                pagedRooms.map((room) => (
                                     <tr key={room.room_id} className="hover:bg-gray-50 transition">
                                         <td className="p-4">
                                             <div className="font-semibold text-gray-800">
@@ -216,7 +241,6 @@ export default function Rooms() {
                                             </div>
                                             <button
                                                 onClick={() => {
-                                                    // Kiểm tra xem phòng đã có sơ đồ chưa (khác null)
                                                     if (room.seat_layout_id) {
                                                         navigate(
                                                             `/admin/seat-layout/${room.seat_layout_id}`
@@ -243,18 +267,15 @@ export default function Rooms() {
                                             </span>
                                         </td>
 
-                                        {/* CỘT SỨC CHỨA CHỈ ĐẾM GHẾ HỢP LỆ */}
                                         <td className="p-4 text-center text-sm font-medium text-gray-600">
                                             <span className="text-blue-600 font-bold">
-                                                {/* Gọi trường dữ liệu valid_seat_count do Backend tính toán */}
                                                 {room.valid_seat_count ?? room.capacity}
                                             </span>
                                             <span className="text-gray-400 mx-1">/</span>
                                             <span>{room.capacity}</span>
                                         </td>
 
-                                        {/* Status Toggle */}
-                                        <td className="p-4">
+                                        <td className="p-4 text-center">
                                             <div className="flex justify-center items-center gap-2">
                                                 <div
                                                     onClick={() => toggleStatus(room)}
@@ -275,7 +296,6 @@ export default function Rooms() {
                                             </div>
                                         </td>
 
-                                        {/* Actions */}
                                         <td className="p-4">
                                             <div className="flex justify-center gap-3">
                                                 <button
@@ -310,7 +330,18 @@ export default function Rooms() {
                         </tbody>
                     </table>
                 </div>
-            )}
+
+                {/* ===== PAGINATION ===== */}
+                {!loading && filteredRooms.length > 0 && (
+                    <div className="py-4 px-6 border-t border-gray-100 bg-white mt-auto">
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Modal Tạo Phòng */}
             {openModal && (

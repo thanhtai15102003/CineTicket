@@ -64,9 +64,24 @@ const Login = () => {
 
                 showToast(`Đăng nhập thành công! Chào mừng ${result.user.full_name}`, 'success');
 
+                // ======================================================
+                // TÍCH HỢP PHÂN QUYỀN ĐIỀU HƯỚNG (ROLE-BASED REDIRECT)
+                // ======================================================
+                const userRole =
+                    result.user?.role?.role_name?.toLowerCase() ||
+                    result.user?.role?.toLowerCase() ||
+                    'user';
+
+                let targetPath = '/'; // Mặc định là trang chủ cho Khách hàng
+
+                // NẾU LÀ ADMIN HOẶC MANAGER THÌ VÀO TRANG QUẢN TRỊ CHUNG
+                if (userRole === 'admin' || userRole === 'manager') {
+                    targetPath = '/dashboard';
+                }
+
                 // Đợi 1.5s để user nhìn thấy thông báo rồi mới chuyển trang
                 setTimeout(() => {
-                    navigate('/');
+                    navigate(targetPath);
                 }, 1500);
             } else {
                 showToast(result.message || 'Email hoặc mật khẩu không đúng!', 'error');

@@ -16,8 +16,13 @@ const Movies = () => {
         return () => clearTimeout(timer);
     }, []);
 
+    // Đã căn giữa toàn bộ màn hình và thiết lập nền đen cho phần loading
     if (isLoading) {
-        return <LoadingSpinner />;
+        return (
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center pt-20">
+                <LoadingSpinner isDark={true} />
+            </div>
+        );
     }
 
     return (
