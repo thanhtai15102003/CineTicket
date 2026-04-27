@@ -44,7 +44,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
                         { headers }
                     ),
                     fetch(
-                        'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts',
+                        'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts?status=active',
                         { headers }
                     )
                 ]);

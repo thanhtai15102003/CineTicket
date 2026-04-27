@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCinema } from '../../components/CinemaContext'; // Lấy Context vào
 import RevealOnScroll from '../../components/common/RevealOnScroll'; // Nhớ import
@@ -7,6 +7,7 @@ const DAY_NAMES = ['CN', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Th
 
 const MovieDetail = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
 
     // ================= CONTEXT: ĐỒNG BỘ RẠP TỪ HEADER =================
     const { selectedCinema: globalCinema, changeCinema } = useCinema();
@@ -37,8 +38,9 @@ const MovieDetail = () => {
     });
     const [isOpenCinema, setIsOpenCinema] = useState(false);
 
-    // showtimes (fake data per cinema)
+    // showtimes
     const [showtimes, setShowtimes] = useState({});
+    const [isLoadingShowtimes, setIsLoadingShowtimes] = useState(false);
 
     // ================= ĐỒNG BỘ LOCAL STATE VỚI GLOBAL STATE =================
     useEffect(() => {
@@ -67,6 +69,17 @@ const MovieDetail = () => {
     const formatDate = (d) =>
         `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
+    // Lấy chuỗi YYYY-MM-DD theo múi giờ local
+    const getLocalYYYYMMDD = (dateObj) => {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const dates = getDates();
+    const currentDateStr = getLocalYYYYMMDD(dates[selectedDate]);
+
     // ================= FETCH MOVIE =================
     useEffect(() => {
         const fetchMovie = async () => {
@@ -76,7 +89,6 @@ const MovieDetail = () => {
                 );
                 const json = await res.json();
 
-                // Phân loại mảng để biết phim này Đang chiếu hay Sắp chiếu
                 const nowShowing = json?.now_showing || [];
                 const comingSoon = json?.coming_soon || [];
 
@@ -86,7 +98,7 @@ const MovieDetail = () => {
                 if (!found) {
                     found = comingSoon.find((m) => m.movie_id === Number(id));
                     if (found) {
-                        isUpcoming = true; // Đánh dấu đây là phim sắp chiếu
+                        isUpcoming = true;
                     }
                 }
 
@@ -117,7 +129,7 @@ const MovieDetail = () => {
                             : found.actors
                         : [],
                     genre: Array.isArray(found.genres) ? found.genres.map((g) => g.genre_name) : [],
-                    is_upcoming: isUpcoming // Lưu cờ is_upcoming
+                    is_upcoming: isUpcoming
                 });
             } catch (err) {
                 console.error(err);
@@ -168,27 +180,6 @@ const MovieDetail = () => {
                     city: c.region?.city || ''
                 }));
                 setCinemas(formatted);
-
-                // Generate fake showtimes per cinema
-                const fakeSlots = [
-                    '09:00',
-                    '10:30',
-                    '12:00',
-                    '13:30',
-                    '15:00',
-                    '16:45',
-                    '18:30',
-                    '20:00',
-                    '21:30',
-                    '23:00'
-                ];
-                const fakeShowtimes = {};
-                formatted.forEach((c) => {
-                    const count = 4 + Math.floor(Math.random() * 5);
-                    const shuffled = [...fakeSlots].sort(() => Math.random() - 0.5);
-                    fakeShowtimes[c.id] = shuffled.slice(0, count).sort();
-                });
-                setShowtimes(fakeShowtimes);
             } catch (err) {
                 console.error(err);
             }
@@ -196,14 +187,51 @@ const MovieDetail = () => {
         fetchCinemas();
     }, []);
 
-    // ================= FILTER =================
+    // ================= FETCH REAL SHOWTIMES VÀ LỌC THEO NGÀY =================
+    useEffect(() => {
+        if (!movie || movie.is_upcoming) return;
+
+        const fetchRealShowtimes = async () => {
+            setIsLoadingShowtimes(true);
+            try {
+                const res = await fetch(
+                    `https://cinema-api-production-f2bc.up.railway.app/api/v1/movies/${id}/showtimes?date=${currentDateStr}`
+                );
+                const json = await res.json();
+
+                const rawData = Array.isArray(json) ? json : json?.data || [];
+
+                const newShowtimes = {};
+                rawData.forEach((cinema) => {
+                    // FIX LỖI Ở ĐÂY: Dùng .filter() để chỉ lấy đúng suất chiếu của ngày currentDateStr
+                    const validSlotsForToday = (cinema.showtimes || []).filter(
+                        (slot) => slot.show_date === currentDateStr
+                    );
+
+                    newShowtimes[cinema.cinema_id] = validSlotsForToday;
+                });
+
+                setShowtimes(newShowtimes);
+            } catch (err) {
+                console.error('Lỗi lấy lịch chiếu:', err);
+            } finally {
+                setIsLoadingShowtimes(false);
+            }
+        };
+
+        fetchRealShowtimes();
+    }, [id, movie, currentDateStr]);
+
+    // ================= FILTER RẠP =================
     const filteredCinemas =
         selectedRegion.id === 'ALL' ? cinemas : cinemas.filter((c) => c.city === selectedRegion.id);
 
-    const displayedCinemas =
+    // Chỉ hiển thị rạp NẾU rạp đó CÓ SUẤT CHIẾU (chiều dài mảng > 0)
+    const displayedCinemas = (
         selectedCinema.id === 'ALL'
             ? filteredCinemas
-            : filteredCinemas.filter((c) => c.id === selectedCinema.id);
+            : filteredCinemas.filter((c) => c.id === selectedCinema.id)
+    ).filter((c) => showtimes[c.id] && showtimes[c.id].length > 0);
 
     // ================= UTILS =================
     const getEmbedUrl = (url) => {
@@ -223,10 +251,10 @@ const MovieDetail = () => {
         }
     };
 
-    const isVipSlot = (slot) => ['21:30', '23:00', '20:00'].includes(slot);
-    const isSoldSlot = (slot) => ['09:00', '10:30'].includes(slot);
+    const isVipSlot = (slotTime) => ['21:30', '23:00', '20:00'].includes(slotTime);
+    const isSoldSlot = (slotTime) => ['09:00', '10:30'].includes(slotTime);
 
-    // ================= LOADING =================
+    // ================= RENDER =================
     if (loading)
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -239,8 +267,6 @@ const MovieDetail = () => {
                 Không tìm thấy phim
             </div>
         );
-
-    const dates = getDates();
 
     return (
         <div className="bg-zinc-950 text-white min-h-screen">
@@ -344,7 +370,6 @@ const MovieDetail = () => {
 
             {/* ================= ĐIỀU KIỆN HIỂN THỊ LỊCH CHIẾU ================= */}
             {movie.is_upcoming ? (
-                // NẾU LÀ PHIM SẮP CHIẾU -> HIỂN THỊ THÔNG BÁO ĐẸP MẮT VÀ ẨN LỊCH CHIẾU
                 <div className="max-w-4xl mx-auto px-6 pb-24 pt-8 text-center">
                     <div className="bg-zinc-900/80 border border-white/5 rounded-2xl p-10 flex flex-col items-center justify-center shadow-2xl relative overflow-hidden">
                         <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
@@ -361,7 +386,6 @@ const MovieDetail = () => {
                     </div>
                 </div>
             ) : (
-                // NẾU LÀ PHIM ĐANG CHIẾU -> HIỂN THỊ CHỌN RẠP & SUẤT CHIẾU BÌNH THƯỜNG
                 <div className="max-w-6xl mx-auto px-6 py-12">
                     <RevealOnScroll delay={50}>
                         <div className="flex items-center gap-3 mb-8">
@@ -372,7 +396,6 @@ const MovieDetail = () => {
                         </div>
                     </RevealOnScroll>
 
-                    {/* THÊM relative z-50 Ở ĐÂY ĐỂ DROPDOWN LUÔN NỔI LÊN TRÊN */}
                     <RevealOnScroll
                         className="relative z-40 flex flex-col md:flex-row items-center gap-4 flex-wrap mb-10"
                         delay={150}
@@ -450,7 +473,7 @@ const MovieDetail = () => {
                                                     name: 'Tất cả rạp'
                                                 });
                                                 setIsOpenRegion(false);
-                                                changeCinema(null); // Xóa lựa chọn rạp global nếu đổi thành phố
+                                                changeCinema(null);
                                             }}
                                             className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
                                                 ${selectedRegion.id === r.id ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
@@ -488,7 +511,7 @@ const MovieDetail = () => {
                                         onClick={() => {
                                             setSelectedCinema({ id: 'ALL', name: 'Tất cả rạp' });
                                             setIsOpenCinema(false);
-                                            changeCinema(null); // Reset global state
+                                            changeCinema(null);
                                         }}
                                         className={`px-5 py-3 text-sm cursor-pointer transition-colors mx-2 rounded-xl
                                             ${selectedCinema.id === 'ALL' ? 'bg-red-500/15 text-red-400 font-bold' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}
@@ -501,7 +524,6 @@ const MovieDetail = () => {
                                             onClick={() => {
                                                 setSelectedCinema(c);
                                                 setIsOpenCinema(false);
-                                                // Đồng bộ ngược lại cho Header (Global State)
                                                 changeCinema({
                                                     cinema_id: c.id,
                                                     cinema_name: c.name,
@@ -522,12 +544,16 @@ const MovieDetail = () => {
                     <div className="h-[1px] w-full bg-zinc-800 mb-8 rounded" />
 
                     {/* ===== SHOWTIME LIST ===== */}
-                    {/* THÊM relative z-10 Ở ĐÂY ĐỂ NÓ NẰM DƯỚI DROPDOWN CỦA BỘ LỌC */}
                     <div className="relative z-10 flex flex-col gap-5">
-                        {displayedCinemas.length === 0 ? (
+                        {isLoadingShowtimes ? (
+                            <div className="py-12 text-center text-zinc-500">
+                                Đang tải lịch chiếu...
+                            </div>
+                        ) : displayedCinemas.length === 0 ? (
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl py-12 text-center">
                                 <p className="text-zinc-500 font-medium">
-                                    Không có suất chiếu nào phù hợp với lựa chọn của bạn.
+                                    Không có suất chiếu nào phù hợp với lựa chọn của bạn trong ngày
+                                    này.
                                 </p>
                             </div>
                         ) : (
@@ -559,22 +585,34 @@ const MovieDetail = () => {
                                             </div>
                                         </div>
                                         <div className="px-6 py-6 flex flex-wrap gap-4">
-                                            {(showtimes[c.id] || []).map((slot) => (
-                                                <button
-                                                    key={slot}
-                                                    disabled={isSoldSlot(slot)}
-                                                    className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300
-                                                        ${
-                                                            isSoldSlot(slot)
-                                                                ? 'border-white/5 bg-white/5 text-zinc-600 line-through cursor-not-allowed'
-                                                                : isVipSlot(slot)
-                                                                  ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
-                                                                  : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
-                                                        }`}
-                                                >
-                                                    {slot}
-                                                </button>
-                                            ))}
+                                            {(showtimes[c.id] || []).map((slotObj) => {
+                                                // Lấy ra chuỗi HH:mm để dùng trong hàm check VIP/Sold của bạn
+                                                const timeStr = slotObj.start_time
+                                                    ? slotObj.start_time.substring(0, 5)
+                                                    : '';
+
+                                                return (
+                                                    <button
+                                                        key={slotObj.showtime_id}
+                                                        onClick={() =>
+                                                            navigate(
+                                                                `/booking/${slotObj.showtime_id}`
+                                                            )
+                                                        }
+                                                        disabled={isSoldSlot(timeStr)}
+                                                        className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300
+                                                            ${
+                                                                isSoldSlot(timeStr)
+                                                                    ? 'border-white/5 bg-white/5 text-zinc-600 line-through cursor-not-allowed'
+                                                                    : isVipSlot(timeStr)
+                                                                      ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
+                                                                      : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
+                                                            }`}
+                                                    >
+                                                        {timeStr}
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </RevealOnScroll>

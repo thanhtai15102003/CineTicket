@@ -269,10 +269,11 @@ export default function Rooms() {
 
                                         <td className="p-4 text-center text-sm font-medium text-gray-600">
                                             <span className="text-blue-600 font-bold">
-                                                {room.valid_seat_count ?? room.capacity}
+                                                {room.valid_seat_count}
                                             </span>
                                             <span className="text-gray-400 mx-1">/</span>
-                                            <span>{room.capacity}</span>
+                                            <span>{room.total_seat_count}</span>{' '}
+                                            {/* Thay room.capacity bằng total_seat_count */}
                                         </td>
 
                                         <td className="p-4 text-center">

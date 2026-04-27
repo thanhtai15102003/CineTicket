@@ -30,19 +30,25 @@ const UserInfoForm = ({ userData, formatDate }) => {
         setConfirmPassword('');
     };
 
-    // ================= XỬ LÝ CẬP NHẬT API =================
+    // ================= XỬ LÝ CẬP NHẬT GỘP CHUNG 1 API =================
     const handleUpdateProfile = async () => {
         const payload = {};
 
-        // Validation Email
-        if (isEditingEmail && email.trim() !== '') {
-            payload.email = email.trim();
+        // --- 1. VALIDATION EMAIL ---
+        if (isEditingEmail) {
+            if (!email.trim()) {
+                alert('❌ Email không được để trống!');
+                return;
+            }
+            if (email.trim() !== userData.email) {
+                payload.email = email.trim();
+            }
         }
 
-        // Validation Mật khẩu
+        // --- 2. VALIDATION MẬT KHẨU ---
         if (isEditingPassword) {
             if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
-                alert('Vui lòng nhập đầy đủ thông tin mật khẩu (Cũ, Mới, Xác nhận)!');
+                alert('❌ Vui lòng nhập đầy đủ thông tin mật khẩu (Cũ, Mới, Xác nhận)!');
                 return;
             }
             if (newPassword !== confirmPassword) {
@@ -54,11 +60,13 @@ const UserInfoForm = ({ userData, formatDate }) => {
                 return;
             }
 
-            // Gửi mật khẩu mới lên API (nếu Backend có yêu cầu gửi old_password để check thì bạn thêm vào đây nhé)
-            payload.password_hash = newPassword.trim();
+            // Gán đúng các key theo yêu cầu của API mới
+            payload.current_password = oldPassword.trim();
+            payload.password = newPassword.trim();
+            payload.password_confirmation = confirmPassword.trim();
         }
 
-        // Nếu không có gì thay đổi thì báo lỗi nhẹ
+        // Kiểm tra xem user có thực sự thay đổi gì không
         if (Object.keys(payload).length === 0) {
             alert('Bạn chưa nhập thông tin thay đổi nào!');
             return;
@@ -68,7 +76,9 @@ const UserInfoForm = ({ userData, formatDate }) => {
 
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(
+
+            // --- 3. GỌI API CẬP NHẬT ---
+            const response = await fetch(
                 'https://cinema-api-production-f2bc.up.railway.app/api/v1/users/me',
                 {
                     method: 'PUT',
@@ -80,22 +90,21 @@ const UserInfoForm = ({ userData, formatDate }) => {
                 }
             );
 
-            if (res.ok) {
-                alert('🎉 Cập nhật thông tin thành công!');
-                // Reset lại giao diện
-                setIsEditingEmail(false);
-                setIsEditingPassword(false);
-                resetPasswordFields();
-
-                // Tải lại trang để cập nhật dữ liệu mới nhất từ BE
-                window.location.reload();
-            } else {
-                const data = await res.json();
-                alert('❌ Cập nhật thất bại: ' + (data.message || 'Lỗi không xác định'));
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || 'Cập nhật thất bại. Vui lòng kiểm tra lại!');
             }
+
+            // --- 4. HOÀN TẤT THÀNH CÔNG ---
+            alert('🎉 Cập nhật thông tin thành công!');
+            setIsEditingEmail(false);
+            setIsEditingPassword(false);
+            resetPasswordFields();
+
+            window.location.reload(); // Refresh để tải lại dữ liệu mới nhất
         } catch (error) {
             console.error('Lỗi API:', error);
-            alert('❌ Lỗi kết nối đến máy chủ!');
+            alert('❌ ' + error.message);
         } finally {
             setIsSubmitting(false);
         }
@@ -308,7 +317,7 @@ const UserInfoForm = ({ userData, formatDate }) => {
                             </div>
                             <input
                                 type="password"
-                                value="123456789" // Mock
+                                value="123456789" // Mock hiển thị sao sao
                                 readOnly
                                 className="w-full bg-black/40 border border-white/5 rounded-xl py-3.5 pl-12 pr-[120px] text-zinc-500 focus:outline-none cursor-not-allowed tracking-[0.3em] hover:border-white/10 transition-colors"
                             />
@@ -325,7 +334,6 @@ const UserInfoForm = ({ userData, formatDate }) => {
                     {/* Trạng thái 2: Khi ĐÃ bấm Đổi mật khẩu (Xổ ra 3 ô) */}
                     {isEditingPassword && (
                         <div className="bg-zinc-800/50 border border-red-500/30 rounded-2xl p-5 mt-1 space-y-4 shadow-[0_0_15px_rgba(220,38,38,0.1)] animate-fade-in-up relative">
-                            {/* Nút Hủy */}
                             <button
                                 type="button"
                                 onClick={() => {
@@ -337,7 +345,6 @@ const UserInfoForm = ({ userData, formatDate }) => {
                                 Hủy bỏ
                             </button>
 
-                            {/* Ô nhập Mật khẩu cũ */}
                             <div className="flex flex-col gap-1.5 pr-16">
                                 <label className="text-zinc-300 text-[11px] uppercase tracking-wide">
                                     Mật khẩu hiện tại
@@ -351,7 +358,6 @@ const UserInfoForm = ({ userData, formatDate }) => {
                                 />
                             </div>
 
-                            {/* Ô nhập Mật khẩu mới */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-red-400 text-[11px] font-bold uppercase tracking-wide">
                                     Mật khẩu mới
@@ -365,7 +371,6 @@ const UserInfoForm = ({ userData, formatDate }) => {
                                 />
                             </div>
 
-                            {/* Ô Xác nhận mật khẩu mới */}
                             <div className="flex flex-col gap-1.5">
                                 <label className="text-red-400 text-[11px] font-bold uppercase tracking-wide">
                                     Xác nhận mật khẩu mới
