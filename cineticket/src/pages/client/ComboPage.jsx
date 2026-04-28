@@ -4,6 +4,7 @@ import BookingProgress from '../../components/BookingProgress';
 import Combos from '../../components/Combos';
 import { showtimes } from '../../data/showtimes';
 import { movies } from '../../data/movie';
+// import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const ComboPage = () => {
     const { showtimeId } = useParams();
@@ -36,7 +37,8 @@ const ComboPage = () => {
 
     return (
         <div className="bg-zinc-950 min-h-screen text-white">
-            <div className="max-w-6xl mx-auto px-6 py-8">
+            {/* Đổi py-8 thành pt-[100px] pb-8 (hoặc pt-28 pb-8) để đẩy nó xuống */}
+            <div className="max-w-6xl mx-auto px-6 pt-[100px] pb-8">
                 <BookingProgress />
                 <h1 className="text-3xl font-bold mb-2">{movie?.title}</h1>
                 <p className="text-zinc-400">

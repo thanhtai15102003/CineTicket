@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 import {
     Calendar,
     Clock,
@@ -67,7 +68,7 @@ export default function CreateShowtime() {
                     setRooms(roomData);
                 }
 
-                // 2. Lấy danh sách Phim (Gộp cả đang chiếu và sắp chiếu)
+                // 2. Lấy danh sách Phim
                 const resMovies = await fetch(
                     'https://cinema-api-production-f2bc.up.railway.app/api/v1/movies'
                 );
@@ -75,6 +76,7 @@ export default function CreateShowtime() {
                 if (resMovies.ok) {
                     const allMovies = [
                         ...(jsonMovies.now_showing || [])
+                        // ...(jsonMovies.coming_soon || []) Lấy cả phim sắp chiếu nếu có
                     ];
                     setMovies(allMovies);
                 }
@@ -89,53 +91,156 @@ export default function CreateShowtime() {
         fetchInitialData();
     }, []);
 
-    /* ================= TIME HELPER ================= */
-    const addMinutes = (time, mins) => {
-        const [h, m] = time.split(':').map(Number);
-        const date = new Date();
-        date.setHours(h);
-        date.setMinutes(m + mins);
-        return date.toTimeString().slice(0, 5);
+    /* ================= TIME HELPERS (FIXED CROSS-MIDNIGHT) ================= */
+    // Chuyển chuỗi "HH:mm" thành tổng số phút
+    const timeToMins = (timeStr) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
     };
 
-    const isBefore = (t1, t2) => {
-        return t1 < t2;
+    // Chuyển tổng số phút thành chuỗi "HH:mm" (tự động reset về 0 nếu qua 24h)
+    const minsToTime = (mins) => {
+        const h = Math.floor((mins % (24 * 60)) / 60);
+        const m = mins % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    // Thêm hàm này ngay dưới hàm minsToTime
+    const getNextDay = (dateStr) => {
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split('T')[0]; // Trả về dạng YYYY-MM-DD
     };
 
     /* ================= AUTO GENERATE ================= */
-    const handleGenerate = () => {
+    const handleGenerate = async () => {
         if (!showDate) return showToast('Vui lòng chọn ngày chiếu!', 'error');
         if (!movieId) return showToast('Vui lòng chọn phim!', 'error');
         if (!roomId) return showToast('Vui lòng chọn phòng chiếu!', 'error');
-        // if (!ticketPrice || ticketPrice < 0) return showToast('Giá vé không hợp lệ!', 'error');
 
-        const selectedMovie = movies.find((m) => m.movie_id == movieId);
-        const movieDuration = selectedMovie?.duration || 120; // Nếu API thiếu thời lượng thì mặc định 120p
+        setIsSubmitting(true); // Bật loading tạm để lấy data các suất đã có
+        try {
+            // Lấy danh sách suất chiếu ĐÃ TỒN TẠI trong ngày đó của CẢ HỆ THỐNG để đối chiếu
+            const token = localStorage.getItem('token');
+            const res = await fetch(
+                `https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/showtimes?date=${showDate}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const json = await res.json();
+            const existingShowtimes = Array.isArray(json?.data)
+                ? json.data
+                : Array.isArray(json)
+                  ? json
+                  : [];
 
-        const result = [];
-        let current = openTime;
-
-        while (isBefore(current, closeTime)) {
-            const end = addMinutes(current, movieDuration);
-
-            // Nếu giờ kết thúc vượt quá giờ đóng cửa rạp thì dừng lại
-            if (end > closeTime && result.length > 0) break;
-
-            result.push({
-                id: Math.random().toString(36).substr(2, 9),
-                start: current,
-                end: end
+            // Lọc ra CÁC SUẤT ĐANG NẰM TRONG CÙNG 1 PHÒNG (roomId)
+            const roomShowtimes = existingShowtimes.filter((st) => {
+                const currentRoomId = st.room_id || st.room?.id || st.room?.room_id;
+                return String(currentRoomId) === String(roomId);
             });
 
-            // Cộng thêm thời gian dọn rạp
-            current = addMinutes(end, cleaningTime);
-        }
+            const selectedMovie = movies.find((m) => m.movie_id == movieId);
+            const movieDuration = selectedMovie?.duration || 120;
 
-        if (result.length === 0) {
-            showToast('Khung giờ quá ngắn, không đủ xếp suất nào!', 'error');
-        } else {
-            setGenerated(result);
-            showToast('Đã tạo danh sách xem trước, bạn có thể tinh chỉnh bên phải.', 'success');
+            let startMins = timeToMins(openTime);
+            let endLimitMins = timeToMins(closeTime);
+
+            if (endLimitMins <= startMins) {
+                endLimitMins += 24 * 60;
+            }
+
+            const result = [];
+            let currentMins = startMins;
+
+            while (currentMins < endLimitMins) {
+                const endMins = currentMins + movieDuration;
+
+                if (endMins > endLimitMins && result.length > 0) break;
+
+                const currentStr = minsToTime(currentMins);
+                const endStr = minsToTime(endMins);
+
+                // ====================================================
+                // THUẬT TOÁN CHECK TRÙNG LỊCH CHÍNH XÁC
+                // ====================================================
+                let conflictInfo = null;
+
+                for (let st of roomShowtimes) {
+                    const stStart = st.start_time.slice(0, 5);
+                    const stEnd = st.end_time.slice(0, 5);
+                    const stStartMins = timeToMins(stStart);
+                    // Giả định các suất cũ cũng có dọn rạp sau khi hết phim
+                    const stEndMins = timeToMins(stEnd) + cleaningTime;
+
+                    // Kiểm tra xem khoảng (currentMins -> endMins) có đè lên khoảng (stStartMins -> stEndMins) không
+                    if (
+                        (currentMins >= stStartMins && currentMins < stEndMins) ||
+                        (endMins > stStartMins && endMins <= stEndMins) ||
+                        (currentMins <= stStartMins && endMins >= stEndMins)
+                    ) {
+                        conflictInfo = st;
+                        break;
+                    }
+                }
+                const isNextDay = currentMins >= 24 * 60;
+                const actualDate = isNextDay ? getNextDay(showDate) : showDate;
+
+                if (conflictInfo) {
+                    // NẾU BỊ TRÙNG: Lưu vào danh sách nhưng đánh dấu lỗi
+                    result.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        start: currentStr,
+                        end: endStr,
+                        date: actualDate, // Lưu lại ngày thực tế
+                        isNextDay: isNextDay, // Cờ để render UI
+                        isConflict: true,
+                        conflictWith: `${conflictInfo.start_time.slice(0, 5)} - ${conflictInfo.end_time.slice(0, 5)} (${conflictInfo.movie_title || 'Suất chiếu khác'})`
+                    });
+
+                    // Đẩy thời gian bắt đầu tiếp theo tránh suất bị trùng
+                    const conflictEndMins =
+                        timeToMins(conflictInfo.end_time.slice(0, 5)) + cleaningTime;
+                    currentMins = conflictEndMins;
+                } else {
+                    // NẾU HỢP LỆ
+                    result.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        start: currentStr,
+                        end: endStr,
+                        date: actualDate, // Lưu lại ngày thực tế
+                        isNextDay: isNextDay, // Cờ để render UI
+                        isConflict: false
+                    });
+
+                    // Cộng dồn dọn rạp bình thường
+                    currentMins = endMins + cleaningTime;
+                }
+            }
+
+            if (result.length === 0) {
+                showToast('Khung giờ quá ngắn hoặc đã kín lịch, không đủ xếp suất nào!', 'error');
+            } else {
+                setGenerated(result);
+
+                // BÁO LỖI NGAY LẬP TỨC NẾU CÓ SUẤT TRÙNG SAU KHI TẠO XONG
+                const hasErrors = result.some((r) => r.isConflict);
+                if (hasErrors) {
+                    showToast(
+                        'Đã tạo danh sách. Có vài suất bị TRÙNG GIỜ, vui lòng xóa chúng (❌) để tiếp tục!',
+                        'error'
+                    );
+                } else {
+                    showToast(
+                        'Tạo danh sách xem trước thành công! Lịch chiếu hoàn toàn hợp lệ.',
+                        'success'
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            showToast('Lỗi khi kiểm tra dữ liệu suất chiếu cũ!', 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -144,27 +249,34 @@ export default function CreateShowtime() {
         setGenerated((prev) => prev.filter((slot) => slot.id !== idToRemove));
     };
 
-    /* ================= SUBMIT TO BACKEND (BULK CREATE) ================= */
+    /* ================= SUBMIT TO BACKEND ================= */
     const handleSubmit = async () => {
         if (generated.length === 0) {
             return showToast('Không có suất chiếu nào để lưu!', 'error');
+        }
+
+        // CHẶN NGHIÊM NGẶT NẾU CÒN SUẤT TRÙNG TRONG DANH SÁCH
+        if (generated.some((slot) => slot.isConflict)) {
+            return showToast(
+                'Danh sách còn chứa suất chiếu bị trùng. Vui lòng xóa (❌) chúng trước khi lưu!',
+                'error'
+            );
         }
 
         const payload = {
             movie_id: Number(movieId),
             room_id: Number(roomId),
             show_date: showDate,
-            // Gửi lên 3 mức giá cấu hình cứng cho suất chiếu này
             price_standard: Number(priceStandard),
             price_vip: Number(priceVip),
             price_double: Number(priceDouble),
             showtimes: generated.map((g) => ({
+                show_date: g.date,
                 start_time: g.start,
                 end_time: g.end
             }))
         };
 
-        console.log('📦 DATA SEND TO BACKEND:', payload);
         setIsSubmitting(true);
 
         try {
@@ -220,8 +332,8 @@ export default function CreateShowtime() {
                 {/* CỘT TRÁI: FORM CẤU HÌNH */}
                 <div className="w-full lg:w-[45%] bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-6 relative">
                     {isLoadingData && (
-                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-2xl">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
+                        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-20 flex items-center justify-center rounded-2xl">
+                            <LoadingSpinner isDark={true} />
                         </div>
                     )}
 
@@ -230,9 +342,7 @@ export default function CreateShowtime() {
                         <h2 className="font-semibold text-gray-700">Thông số đầu vào</h2>
                     </div>
 
-                    {/* Dòng 1: Ngày chiếu & Giá vé */}
                     <div className="grid grid-cols-2 gap-4">
-                        {/* Dòng 1: Ngày chiếu */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
                                 Ngày chiếu
@@ -257,11 +367,12 @@ export default function CreateShowtime() {
                         <label className="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-wider">
                             <Ticket size={18} className="text-red-500" /> Cấu hình giá vé
                         </label>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Ghế Thường */}
                             <div className="border border-gray-200 rounded-xl p-3 shadow-sm bg-white focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all cursor-text">
-                                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Ghế Thường</label>
+                                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                                    Ghế Thường
+                                </label>
                                 <div className="flex items-baseline gap-1">
                                     <input
                                         type="number"
@@ -273,9 +384,10 @@ export default function CreateShowtime() {
                                 </div>
                             </div>
 
-                            {/* Ghế VIP */}
                             <div className="border border-orange-200 rounded-xl p-3 shadow-sm bg-orange-50/50 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-100 transition-all cursor-text">
-                                <label className="block text-[11px] font-bold text-orange-500 uppercase tracking-wider mb-1">Ghế VIP</label>
+                                <label className="block text-[11px] font-bold text-orange-500 uppercase tracking-wider mb-1">
+                                    Ghế VIP
+                                </label>
                                 <div className="flex items-baseline gap-1">
                                     <input
                                         type="number"
@@ -283,13 +395,16 @@ export default function CreateShowtime() {
                                         onChange={(e) => setPriceVip(e.target.value)}
                                         className="w-full text-lg font-bold text-gray-800 bg-transparent focus:outline-none p-0 border-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
-                                    <span className="text-sm font-semibold text-orange-500">VNĐ</span>
+                                    <span className="text-sm font-semibold text-orange-500">
+                                        VNĐ
+                                    </span>
                                 </div>
                             </div>
 
-                            {/* Ghế Đôi */}
                             <div className="border border-pink-200 rounded-xl p-3 shadow-sm bg-pink-50/50 focus-within:border-pink-500 focus-within:ring-2 focus-within:ring-pink-100 transition-all cursor-text">
-                                <label className="block text-[11px] font-bold text-pink-500 uppercase tracking-wider mb-1">Ghế Đôi</label>
+                                <label className="block text-[11px] font-bold text-pink-500 uppercase tracking-wider mb-1">
+                                    Ghế Đôi
+                                </label>
                                 <div className="flex items-baseline gap-1">
                                     <input
                                         type="number"
@@ -303,7 +418,6 @@ export default function CreateShowtime() {
                         </div>
                     </div>
 
-                    {/* Dòng 2: Phim & Phòng */}
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
@@ -364,7 +478,7 @@ export default function CreateShowtime() {
                         </div>
                     </div>
 
-                    {/* Dòng 3: Cấu hình thời gian */}
+                    {/* Cấu hình thời gian */}
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-4 mt-4">
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
                             Khung giờ hoạt động
@@ -412,7 +526,7 @@ export default function CreateShowtime() {
 
                     <button
                         onClick={handleGenerate}
-                        disabled={isLoadingData}
+                        disabled={isLoadingData || isSubmitting}
                         className="w-full bg-zinc-800 text-white font-semibold py-3 rounded-xl hover:bg-black transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Tạo danh sách xem trước
@@ -442,25 +556,46 @@ export default function CreateShowtime() {
                             {generated.map((slot, i) => (
                                 <div
                                     key={slot.id}
-                                    className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors group"
+                                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 border rounded-xl transition-colors group ${
+                                        slot.isConflict
+                                            ? 'bg-red-50/80 border-red-200'
+                                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                                    }`}
                                 >
                                     <div className="flex items-center gap-4">
-                                        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-500">
+                                        <div
+                                            className={`w-8 h-8 rounded-full bg-white border flex items-center justify-center text-xs font-bold ${slot.isConflict ? 'border-red-200 text-red-500' : 'border-gray-200 text-gray-500'}`}
+                                        >
                                             {i + 1}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-gray-800 text-lg">
+                                            <div
+                                                className={`font-bold text-lg ${slot.isConflict ? 'text-red-700 line-through opacity-70' : 'text-gray-800'}`}
+                                            >
                                                 {slot.start}{' '}
                                                 <span className="text-gray-400 text-sm font-normal mx-1">
                                                     đến
                                                 </span>{' '}
                                                 {slot.end}
+
+                                                {/* THÊM BADGE QUA NGÀY Ở ĐÂY */}
+                                                {slot.isNextDay && (
+                                                    <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold uppercase">
+                                                        Hôm sau ({slot.date.split('-').reverse().join('/')})
+                                                    </span>
+                                                )}
                                             </div>
+                                            {slot.isConflict && (
+                                                <div className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
+                                                    <span>❌</span>
+                                                    <span>Trùng với: {slot.conflictWith}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => handleRemoveGeneratedSlot(slot.id)}
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-100 rounded-lg transition-colors mt-2 sm:mt-0"
                                         title="Xóa suất chiếu này"
                                     >
                                         <Trash2 size={18} />

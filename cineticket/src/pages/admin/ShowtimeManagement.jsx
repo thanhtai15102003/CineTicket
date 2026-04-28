@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Clock, Plus, Pencil, Trash2, Calendar, Ticket } from 'lucide-react';
 import Toast from '../../components/common/Toast';
 import { useNavigate } from 'react-router-dom';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function ShowtimeManagement() {
     // Mặc định lấy ngày hôm nay (YYYY-MM-DD)
@@ -253,7 +254,7 @@ export default function ShowtimeManagement() {
             {/* HEADER & DATE PICKER */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
                 <div>
-                    <h1 className="text-xl font-bold text-gray-800">Quản lý suất chiếu</h1>
+                    <h1 className="text-xl font-bold text-gray-800">Danh sách suất chiếu</h1>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -289,9 +290,7 @@ export default function ShowtimeManagement() {
 
             {/* LIST */}
             {loading ? (
-                <div className="flex justify-center items-center h-40">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-                </div>
+                <LoadingSpinner />
             ) : data.length === 0 ? (
                 <div className="bg-white p-10 rounded-2xl shadow-sm text-center border border-gray-100">
                     <p className="text-gray-500">Không có suất chiếu nào trong ngày này.</p>

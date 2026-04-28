@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { CreateRoomModal } from './CreateRoomModal';
 import Toast from '../../components/common/Toast';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Pagination from '../../components/common/Pagination'; // <-- THÊM IMPORT NÀY
+import Pagination from '../../components/common/Pagination';
 
 export default function Rooms() {
     const navigate = useNavigate();
@@ -12,7 +12,10 @@ export default function Rooms() {
     const [rooms, setRooms] = useState([]);
     const [search, setSearch] = useState('');
     const [tab, setTab] = useState('all');
+
+    // Quản lý Modal
     const [openModal, setOpenModal] = useState(false);
+    const [roomToEdit, setRoomToEdit] = useState(null); // Biến chứa dữ liệu phòng cần sửa
 
     // States cho UI/UX
     const [loading, setLoading] = useState(true);
@@ -133,6 +136,17 @@ export default function Rooms() {
         }
     };
 
+    // ================== ACTIONS MỞ MODAL ==================
+    const handleOpenCreate = () => {
+        setRoomToEdit(null); // Reset rỗng để form tạo mới
+        setOpenModal(true);
+    };
+
+    const handleOpenEdit = (room) => {
+        setRoomToEdit(room); // Truyền dữ liệu cũ vào để form biết đang Sửa
+        setOpenModal(true);
+    };
+
     // ================== FILTERING & PAGINATION ==================
     const filteredRooms = rooms.filter((room) => {
         const matchSearch = room.room_name?.toLowerCase().includes(search.toLowerCase());
@@ -146,7 +160,6 @@ export default function Rooms() {
 
     const totalPages = Math.ceil(filteredRooms.length / ITEMS_PER_PAGE);
 
-    // Chống kẹt trang khi xóa phần tử cuối cùng của trang
     useEffect(() => {
         if (page > totalPages && totalPages > 0) {
             setPage(totalPages);
@@ -169,7 +182,7 @@ export default function Rooms() {
                 <h2 className="text-2xl font-semibold">Danh sách phòng chiếu</h2>
 
                 <button
-                    onClick={() => setOpenModal(true)}
+                    onClick={handleOpenCreate}
                     className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
                 >
                     <Plus size={18} /> Tạo phòng chiếu
@@ -272,8 +285,7 @@ export default function Rooms() {
                                                 {room.valid_seat_count}
                                             </span>
                                             <span className="text-gray-400 mx-1">/</span>
-                                            <span>{room.total_seat_count}</span>{' '}
-                                            {/* Thay room.capacity bằng total_seat_count */}
+                                            <span>{room.total_seat_count || room.capacity}</span>
                                         </td>
 
                                         <td className="p-4 text-center">
@@ -300,6 +312,7 @@ export default function Rooms() {
                                         <td className="p-4">
                                             <div className="flex justify-center gap-3">
                                                 <button
+                                                    onClick={() => handleOpenEdit(room)}
                                                     className="text-blue-500 hover:text-blue-700 transition"
                                                     title="Chỉnh sửa"
                                                 >
@@ -344,13 +357,18 @@ export default function Rooms() {
                 )}
             </div>
 
-            {/* Modal Tạo Phòng */}
+            {/* Modal Tạo/Sửa Phòng */}
             {openModal && (
                 <CreateRoomModal
-                    onClose={() => setOpenModal(false)}
-                    onCreate={() => {
-                        fetchRooms();
+                    roomData={roomToEdit} // Dữ liệu phòng (nếu là Sửa) hoặc null (nếu là Tạo mới)
+                    onClose={() => {
                         setOpenModal(false);
+                        setRoomToEdit(null);
+                    }}
+                    onCreate={() => {
+                        fetchRooms(); // Tải lại danh sách
+                        setOpenModal(false); // Đóng modal
+                        setRoomToEdit(null);
                     }}
                 />
             )}

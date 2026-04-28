@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 const MovieCard = ({ movie }) => {
     const [openTrailer, setOpenTrailer] = useState(false);
@@ -193,35 +194,35 @@ const MovieCard = ({ movie }) => {
                 </div>
             </div>
 
-            {/* 🎬 6. Modal Trailer */}
-            {openTrailer && (
-                <div
-                    className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4 transition-all duration-300"
-                    onClick={() => setOpenTrailer(false)} // Click ra ngoài để đóng
-                >
+            {/* 🎬 6. Modal Trailer ĐÃ ĐƯỢC DÙNG PORTAL ĐỂ PHÓNG TO TOÀN MÀN HÌNH */}
+            {openTrailer &&
+                createPortal(
                     <div
-                        className="relative w-full max-w-4xl aspect-video rounded-2xl overflow-hidden shadow-2xl shadow-red-500/10 border border-zinc-800 animate-zoomIn"
-                        onClick={(e) => e.stopPropagation()} // Ngăn đóng khi click vào video
+                        className="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center z-[100] p-4 transition-all duration-300"
+                        onClick={() => setOpenTrailer(false)}
                     >
-                        {/* Nút đóng */}
-                        <button
-                            onClick={() => setOpenTrailer(false)}
-                            className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-black/50 text-white/70 hover:bg-white hover:text-black hover:rotate-90 transition-all duration-300"
+                        <div
+                            className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.3)] border border-zinc-800 animate-zoomIn"
+                            onClick={(e) => e.stopPropagation()}
                         >
-                            ✖
-                        </button>
+                            <button
+                                onClick={() => setOpenTrailer(false)}
+                                className="absolute top-4 right-4 z-10 w-10 h-10 bg-black/50 backdrop-blur-sm text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors border border-white/10"
+                            >
+                                ✕
+                            </button>
 
-                        {/* Video */}
-                        <iframe
-                            className="w-full h-full"
-                            src={getEmbedUrl(movie.trailer_url)}
-                            title={`${movie.title} - Trailer`}
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                        ></iframe>
-                    </div>
-                </div>
-            )}
+                            <iframe
+                                className="w-full h-full"
+                                src={getEmbedUrl(movie.trailer_url)}
+                                title={`${movie.title} - Trailer`}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            ></iframe>
+                        </div>
+                    </div>,
+                    document.body // <-- DỊCH CHUYỂN MODAL RA THẲNG BODY
+                )}
         </>
     );
 };

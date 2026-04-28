@@ -1,49 +1,79 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { showtimes } from '../../data/showtimes';
-import { movies } from '../../data/movie';
 import SeatMap from '../../components/SeatMap';
 import BookingProgress from '../../components/BookingProgress';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 const Booking = () => {
     const { showtimeId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
+    // State cho dữ liệu từ API
     const [showtime, setShowtime] = useState(null);
     const [movie, setMovie] = useState(null);
+    const [seatLayout, setSeatLayout] = useState(null);
+    const [soldSeats, setSoldSeats] = useState([]);
+
+    // State cho lựa chọn của người dùng
     const [selectedSeats, setSelectedSeats] = useState([]);
+
+    // State cho UI
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [showRulesModal, setShowRulesModal] = useState(false); // STATE QUẢN LÝ MODAL QUY ĐỊNH
 
     useEffect(() => {
-        const id = Number(showtimeId);
-
-        if (!showtimeId || isNaN(id)) {
-            setError(`showtimeId không hợp lệ: ${showtimeId}`);
-            setLoading(false);
+        // KIỂM TRA ĐĂNG NHẬP (Auth Guard)
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('currentUser');
+        if (!token || !user) {
+            navigate('/login', { state: { from: location.pathname } });
             return;
         }
 
-        const foundShowtime = showtimes.find((s) => s.showtime_id === id);
+        const fetchShowtimeDetails = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await fetch(
+                    `https://cinema-api-production-f2bc.up.railway.app/api/v1/showtimes/${showtimeId}`
+                );
+                const json = await res.json();
 
-        if (!foundShowtime) {
-            setError(`Không tìm thấy suất chiếu với ID: ${id}`);
-            setLoading(false);
-            return;
-        }
+                if (!res.ok) {
+                    throw new Error(
+                        json.message || `Không tìm thấy suất chiếu với ID: ${showtimeId}`
+                    );
+                }
 
-        setShowtime(foundShowtime);
+                const data = json.data || json;
 
-        const foundMovie = movies.find((m) => m.movie_id === foundShowtime.movie_id);
-        if (!foundMovie) {
-            setError('Không tìm thấy thông tin phim');
-            setLoading(false);
-            return;
-        }
+                setShowtime({
+                    showtime_id: data.showtime_id,
+                    start_time: data.start_time?.substring(0, 5),
+                    show_date: data.show_date,
+                    room: data.room?.room_name,
+                    format: data.room?.room_type?.name,
+                    cinema: data.room?.cinema?.cinema_name,
+                    prices: {
+                        single: data.price_standard,
+                        vip: data.price_vip,
+                        double: data.price_double
+                    }
+                });
+                setMovie(data.movie);
+                setSeatLayout(data.room?.seat_layout?.layout_data || []);
+                setSoldSeats(data.sold_seats || []);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        setMovie(foundMovie);
-        setLoading(false);
-    }, [showtimeId]);
+        if (showtimeId) fetchShowtimeDetails();
+    }, [showtimeId, navigate, location.pathname]);
 
     const handleSeatSelect = (seat) => {
         if (selectedSeats.some((s) => s.id === seat.id)) {
@@ -53,8 +83,13 @@ const Booking = () => {
         }
     };
 
-    // Khi bấm tiếp tục, lưu selectedSeats vào localStorage và chuyển sang combo
-    const handleContinue = () => {
+    // MỞ MODAL QUY ĐỊNH THAY VÌ CHUYỂN TRANG LUÔN
+    const handleContinueClick = () => {
+        setShowRulesModal(true);
+    };
+
+    // KHI KHÁCH ĐỒNG Ý QUY ĐỊNH -> LƯU DATA VÀ CHUYỂN TRANG
+    const confirmContinue = () => {
         localStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
         localStorage.setItem('bookingMovie', JSON.stringify(movie));
         localStorage.setItem('bookingShowtime', JSON.stringify(showtime));
@@ -66,10 +101,7 @@ const Booking = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-white">
-                <div className="text-center">
-                    <div className="animate-spin w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p>Đang tải thông tin suất chiếu...</p>
-                </div>
+                <LoadingSpinner isDark={true} />
             </div>
         );
     }
@@ -94,8 +126,8 @@ const Booking = () => {
         return <div className="text-white text-center py-20">Không có dữ liệu</div>;
 
     return (
-        <div className="bg-zinc-950 min-h-screen text-white">
-            <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="bg-zinc-950 min-h-screen text-white relative">
+            <div className="max-w-6xl mx-auto px-6 pt-[100px] pb-8">
                 <BookingProgress />
 
                 <h1 className="text-3xl font-bold mb-2">{movie.title}</h1>
@@ -106,7 +138,13 @@ const Booking = () => {
 
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
                     <div className="lg:col-span-8">
-                        <SeatMap selectedSeats={selectedSeats} onSeatSelect={handleSeatSelect} />
+                        <SeatMap
+                            seatLayout={seatLayout}
+                            soldSeats={[]}
+                            selectedSeats={selectedSeats}
+                            onSeatSelect={handleSeatSelect}
+                            prices={showtime.prices}
+                        />
                     </div>
 
                     <div className="lg:col-span-4">
@@ -172,15 +210,15 @@ const Booking = () => {
                             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                                 <button
                                     onClick={() => navigate(-1)}
-                                    className="flex-1 border border-zinc-700 bg-zinc-900 py-4 rounded-xl font-semibold text-lg text-white hover:border-red-500 hover:text-red-400"
+                                    className="flex-1 border border-zinc-700 bg-zinc-900 py-4 rounded-xl font-semibold text-lg text-white hover:border-red-500 hover:text-red-400 transition"
                                 >
                                     Quay lại
                                 </button>
 
                                 <button
                                     disabled={selectedSeats.length === 0}
-                                    className="flex-1 bg-orange-600 py-4 rounded-xl font-semibold text-lg disabled:bg-zinc-700"
-                                    onClick={handleContinue}
+                                    className="flex-1 bg-orange-600 py-4 rounded-xl font-semibold text-lg disabled:bg-zinc-700 hover:bg-orange-700 transition shadow-[0_0_15px_rgba(234,88,12,0.3)] disabled:shadow-none"
+                                    onClick={handleContinueClick} // Đã đổi hàm gọi ở đây
                                 >
                                     Tiếp tục
                                 </button>
@@ -189,6 +227,79 @@ const Booking = () => {
                     </div>
                 </div>
             </div>
+
+            {/* ================= MODAL QUY ĐỊNH RẠP ================= */}
+            {showRulesModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-[0_0_40px_rgba(0,0,0,0.5)] transform transition-all animate-fade-in-up">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-6 w-6 text-orange-500"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinelinejoin="round"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                    />
+                                </svg>
+                            </div>
+                            <h3 className="text-2xl font-bold text-white tracking-wide">
+                                Quy định rạp
+                            </h3>
+                        </div>
+
+                        <div className="space-y-5 text-zinc-300 text-[15px] mb-8 leading-relaxed">
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🔞</span>
+                                <p>
+                                    Phim dành cho khán giả từ{' '}
+                                    <strong className="text-red-400">
+                                        {movie?.age_limit || 'đúng độ tuổi quy định'}
+                                    </strong>
+                                    . Rạp có quyền từ chối việc xem phim nếu khách hàng không mang
+                                    giấy tờ tùy thân.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🍿</span>
+                                <p>
+                                    Tuyệt đối không mang đồ ăn, thức uống từ bên ngoài vào rạp chiếu
+                                    phim.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🎟️</span>
+                                <p>
+                                    Vé đã mua thành công{' '}
+                                    <strong className="text-white">không thể hoàn hoặc hủy</strong>{' '}
+                                    dưới mọi hình thức.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowRulesModal(false)}
+                                className="flex-1 py-3 px-4 rounded-xl font-semibold bg-zinc-800 text-white hover:bg-zinc-700 transition"
+                            >
+                                Hủy bỏ
+                            </button>
+                            <button
+                                onClick={confirmContinue}
+                                className="flex-1 py-3 px-4 rounded-xl font-semibold bg-orange-600 text-white hover:bg-orange-500 transition shadow-[0_0_15px_rgba(234,88,12,0.4)]"
+                            >
+                                Tôi đồng ý
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

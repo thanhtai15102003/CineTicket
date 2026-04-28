@@ -3,20 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Check, X } from 'lucide-react';
 import Toast from '../../components/common/Toast';
 
-export function CreateRoomModal({ onClose, onCreate }) {
+export function CreateRoomModal({ onClose, onCreate, roomData }) {
     const navigate = useNavigate();
 
-    // 👉 Form State Tạo Phòng
+    // Xác định đang ở chế độ Sửa (Edit) hay Tạo mới (Create)
+    const isEdit = !!roomData;
+
+    // 👉 Form States
     const [name, setName] = useState('');
     const [typeId, setTypeId] = useState('');
     const [layoutId, setLayoutId] = useState('');
+    const [cinemaId, setCinemaId] = useState('');
 
-    // State loading khi bấm tạo phòng
+    // State lưu cinema_id của Manager đang đăng nhập (Nếu có)
+    const [managerCinemaId, setManagerCinemaId] = useState(null);
+
+    // State loading khi bấm lưu
     const [isCreating, setIsCreating] = useState(false);
 
     // 👉 Data States từ API
     const [roomTypes, setRoomTypes] = useState([]);
     const [layouts, setLayouts] = useState([]);
+    const [cinemas, setCinemas] = useState([]);
 
     // 👉 Room Types Management State
     const [showTypeManager, setShowTypeManager] = useState(false);
@@ -29,7 +37,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
     const showToast = (message) => setToast({ show: true, message });
     const getToken = () => localStorage.getItem('token');
 
-    // ================== FETCH DATA (TYPES & LAYOUTS) ==================
+    // ================== FETCH DATA KHỞI TẠO ==================
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
@@ -38,7 +46,11 @@ export function CreateRoomModal({ onClose, onCreate }) {
                     Accept: 'application/json'
                 };
 
-                const [typesRes, layoutsRes] = await Promise.all([
+                // Tải song song Thông tin User, Loại phòng, Layout và Danh sách Rạp
+                const [meRes, typesRes, layoutsRes, cinemasRes] = await Promise.all([
+                    fetch('https://cinema-api-production-f2bc.up.railway.app/api/v1/users/me', {
+                        headers
+                    }),
                     fetch(
                         'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/room-types',
                         { headers }
@@ -46,22 +58,29 @@ export function CreateRoomModal({ onClose, onCreate }) {
                     fetch(
                         'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/seat-layouts?status=active',
                         { headers }
-                    )
+                    ),
+                    fetch('https://cinema-api-production-f2bc.up.railway.app/api/v1/cinemas', {
+                        headers
+                    })
                 ]);
 
+                const userJson = await meRes.json();
                 const typesJson = await typesRes.json();
                 const layoutsJson = await layoutsRes.json();
+                const cinemasJson = await cinemasRes.json();
 
+                // 1. Xử lý dữ liệu User để lấy cinema_id
+                const userData = userJson?.data || userJson;
+                const currentManagerCinemaId = userData?.cinema_id || null;
+                setManagerCinemaId(currentManagerCinemaId);
+
+                // 2. Xử lý các Data khác
                 const typesData = Array.isArray(typesJson?.data)
                     ? typesJson.data
                     : Array.isArray(typesJson)
                       ? typesJson
                       : [];
                 setRoomTypes(typesData);
-                if (typesData.length > 0) {
-                    const firstActive = typesData.find((rt) => rt.status === 'active');
-                    if (firstActive) setTypeId(firstActive.room_type_id);
-                }
 
                 const layoutsData = Array.isArray(layoutsJson?.data)
                     ? layoutsJson.data
@@ -69,8 +88,30 @@ export function CreateRoomModal({ onClose, onCreate }) {
                       ? layoutsJson
                       : [];
                 setLayouts(layoutsData);
-                if (layoutsData.length > 0) {
-                    setLayoutId(layoutsData[0].layout_id || layoutsData[0].id);
+
+                const cinemasData = Array.isArray(cinemasJson?.data)
+                    ? cinemasJson.data
+                    : Array.isArray(cinemasJson)
+                      ? cinemasJson
+                      : [];
+                setCinemas(cinemasData);
+
+                // 3. Gán giá trị mặc định NẾU LÀ TẠO MỚI
+                if (!isEdit) {
+                    // Nếu Manager bị gán cứng vào rạp -> Lấy ID rạp đó. Nếu là Admin tổng -> Lấy rạp đầu tiên
+                    if (currentManagerCinemaId) {
+                        setCinemaId(currentManagerCinemaId);
+                    } else if (cinemasData.length > 0) {
+                        setCinemaId(cinemasData[0].cinema_id);
+                    }
+
+                    if (typesData.length > 0) {
+                        const firstActive = typesData.find((rt) => rt.status === 'active');
+                        if (firstActive) setTypeId(firstActive.room_type_id);
+                    }
+                    if (layoutsData.length > 0) {
+                        setLayoutId(layoutsData[0].layout_id || layoutsData[0].id);
+                    }
                 }
             } catch (error) {
                 console.error('Lỗi fetch data khởi tạo:', error);
@@ -79,7 +120,23 @@ export function CreateRoomModal({ onClose, onCreate }) {
         };
 
         fetchInitialData();
-    }, []);
+    }, [isEdit]);
+
+    // ================== ĐIỀN SẴN DỮ LIỆU NẾU LÀ CHẾ ĐỘ SỬA ==================
+    useEffect(() => {
+        if (isEdit && roomData) {
+            setName(roomData.room_name || '');
+            setTypeId(roomData.room_type_id || '');
+            setLayoutId(roomData.seat_layout_id || '');
+
+            if (roomData.cinema_id) {
+                setCinemaId(roomData.cinema_id);
+            } else if (cinemas.length > 0 && roomData.cinema) {
+                const foundCinema = cinemas.find((c) => c.cinema_name === roomData.cinema);
+                if (foundCinema) setCinemaId(foundCinema.cinema_id);
+            }
+        }
+    }, [isEdit, roomData, cinemas]);
 
     const fetchRoomTypes = async () => {
         try {
@@ -99,7 +156,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
         }
     };
 
-    // ================== ADD ROOM TYPE ==================
+    // ================== QUẢN LÝ LOẠI PHÒNG ==================
     const handleAddType = async () => {
         if (!newTypeName.trim()) return showToast('Vui lòng nhập tên loại phòng ❗');
         try {
@@ -135,7 +192,6 @@ export function CreateRoomModal({ onClose, onCreate }) {
         }
     };
 
-    // ================== UPDATE ROOM TYPE ==================
     const handleUpdateType = async () => {
         if (!editingType?.name.trim()) return;
         try {
@@ -170,10 +226,8 @@ export function CreateRoomModal({ onClose, onCreate }) {
         }
     };
 
-    // ================== TOGGLE STATUS TYPE ==================
     const handleToggleTypeStatus = async (rt) => {
         const newStatus = rt.status === 'active' ? 'inactive' : 'active';
-
         setRoomTypes((prev) =>
             prev.map((t) => (t.room_type_id === rt.room_type_id ? { ...t, status: newStatus } : t))
         );
@@ -214,18 +268,20 @@ export function CreateRoomModal({ onClose, onCreate }) {
         }
     };
 
-    // ================== CREATE ROOM (KẾT NỐI API) ==================
-    const handleCreate = async () => {
+    // ================== SUBMIT FORM (CREATE / UPDATE) ==================
+    const handleSubmit = async () => {
         if (!name.trim()) return showToast('Vui lòng nhập tên phòng chiếu ❗');
+        if (!cinemaId) return showToast('Vui lòng chọn cụm rạp ❗');
         if (!typeId) return showToast('Vui lòng chọn loại phòng ❗');
-        if (!layoutId) return showToast('Vui lòng chọn khung sơ đồ ghế ❗');
+        if (!layoutId && !isEdit) return showToast('Vui lòng chọn khung sơ đồ ghế ❗');
 
         const selectedLayoutObj = layouts.find((l) => (l.layout_id || l.id) == layoutId);
+
         const capacityEstimate = selectedLayoutObj
             ? selectedLayoutObj.capacity ||
               selectedLayoutObj.row_count * selectedLayoutObj.column_count ||
               0
-            : 0;
+            : roomData?.total_seat_count || roomData?.capacity || 0;
 
         setIsCreating(true);
 
@@ -233,47 +289,50 @@ export function CreateRoomModal({ onClose, onCreate }) {
             const payload = {
                 room_name: name.trim(),
                 room_type_id: Number(typeId),
-                seat_layout_id: Number(layoutId), // Đổi layout_id thành seat_layout_id
+                seat_layout_id: layoutId ? Number(layoutId) : null,
                 capacity: capacityEstimate,
-                status: 'active',
-                cinema_id: 2 // Đừng quên truyền ID của rạp nếu API bắt buộc nhé
+                cinema_id: Number(cinemaId),
+                status: roomData?.status || 'active'
             };
 
-            const res = await fetch(
-                'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/rooms',
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${getToken()}`,
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                }
-            );
+            const url = isEdit
+                ? `https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/rooms/${roomData.room_id}`
+                : 'https://cinema-api-production-f2bc.up.railway.app/api/v1/manager/rooms';
+
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    Authorization: `Bearer ${getToken()}`,
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
 
             const result = await res.json();
 
             if (res.ok) {
-                setToast({ show: true, message: 'Tạo phòng thành công 🎉' });
-
-                // Gọi onCreate để component cha (Rooms.jsx) fetch lại data
+                showToast(isEdit ? 'Cập nhật phòng thành công 🎉' : 'Tạo phòng thành công 🎉');
                 if (onCreate) onCreate();
 
-                // Lấy ID phòng vừa tạo để chuyển hướng đến trang chỉnh sửa layout của phòng đó
-                const newRoomId = result.data?.room_id || result.room_id;
-
                 setTimeout(() => {
-                    if (newRoomId) {
-                        navigate(`/admin/seat-layout/${layoutId}`);
+                    if (!isEdit) {
+                        const newRoomId = result.data?.room_id || result.room_id;
+                        if (newRoomId && layoutId) {
+                            navigate(`/admin/seat-layout/${layoutId}`);
+                        }
                     }
                     onClose();
                 }, 1000);
             } else {
-                showToast(result.message || 'Tạo phòng thất bại ❌');
+                showToast(
+                    result.message || (isEdit ? 'Cập nhật thất bại ❌' : 'Tạo phòng thất bại ❌')
+                );
             }
         } catch (error) {
-            console.error('Lỗi khi tạo phòng:', error);
+            console.error('Lỗi khi submit:', error);
             showToast('Lỗi kết nối server ❌');
         } finally {
             setIsCreating(false);
@@ -285,7 +344,10 @@ export function CreateRoomModal({ onClose, onCreate }) {
         ? currentSelectedLayout.capacity ||
           currentSelectedLayout.row_count * currentSelectedLayout.column_count ||
           0
-        : 0;
+        : roomData?.total_seat_count || roomData?.capacity || 0;
+
+    // Logic xác định xem có cho phép người dùng thay đổi Rạp hay không
+    const isCinemaLocked = isEdit || !!managerCinemaId;
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
@@ -299,7 +361,9 @@ export function CreateRoomModal({ onClose, onCreate }) {
             <div className="bg-white w-[500px] max-h-[90vh] flex flex-col rounded-2xl shadow-2xl animate-fade-in-up">
                 {/* Header Modal */}
                 <div className="flex justify-between items-center px-6 py-4 border-b bg-gray-50 rounded-t-2xl">
-                    <h2 className="text-xl font-bold text-gray-800">Tạo phòng chiếu mới</h2>
+                    <h2 className="text-xl font-bold text-gray-800">
+                        {isEdit ? 'Cập nhật phòng chiếu' : 'Tạo phòng chiếu mới'}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 transition"
@@ -323,6 +387,38 @@ export function CreateRoomModal({ onClose, onCreate }) {
                         />
                     </div>
 
+                    {/* Cụm rạp */}
+                    <div className="mb-4">
+                        <label className="text-sm font-medium text-gray-700 mb-1 block">
+                            Thuộc rạp
+                        </label>
+                        <select
+                            className={`w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition ${
+                                isCinemaLocked
+                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    : 'bg-white cursor-pointer'
+                            }`}
+                            value={cinemaId}
+                            onChange={(e) => setCinemaId(e.target.value)}
+                            disabled={isCinemaLocked} // Khóa nếu đang Edit HOẶC Manager này bị gắn với 1 rạp cố định
+                        >
+                            <option value="" disabled>
+                                -- Chọn cụm rạp --
+                            </option>
+                            {cinemas.map((c) => (
+                                <option key={c.cinema_id} value={c.cinema_id}>
+                                    {c.cinema_name}
+                                </option>
+                            ))}
+                        </select>
+
+                        <p className="text-xs text-gray-500 mt-1.5 italic">
+                            {isCinemaLocked
+                                ? '🔒 Phòng chiếu được cố định theo rạp chiếu hiện tại của bạn.'
+                                : '💡 Là Admin, bạn có quyền chọn cụm rạp bất kỳ để tạo phòng.'}
+                        </p>
+                    </div>
+
                     {/* Loại phòng */}
                     <div className="mb-5 bg-gray-50 p-4 rounded-xl border border-gray-200">
                         <div className="flex items-center justify-between mb-2">
@@ -343,7 +439,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
                         </div>
 
                         <select
-                            className="w-full border border-gray-300 px-4 py-2.5 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500/50 transition"
+                            className="w-full border border-gray-300 px-4 py-2.5 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-red-500/50 transition cursor-pointer"
                             value={typeId}
                             onChange={(e) => setTypeId(e.target.value)}
                         >
@@ -351,10 +447,12 @@ export function CreateRoomModal({ onClose, onCreate }) {
                                 -- Chọn loại phòng --
                             </option>
                             {roomTypes
-                                .filter((rt) => rt.status === 'active')
+                                .filter(
+                                    (rt) => rt.status === 'active' || rt.room_type_id === typeId
+                                )
                                 .map((rt) => (
                                     <option key={rt.room_type_id} value={rt.room_type_id}>
-                                        {rt.name}
+                                        {rt.name} {rt.status !== 'active' ? '(Đang tắt)' : ''}
                                     </option>
                                 ))}
                         </select>
@@ -375,7 +473,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
                                             type="button"
                                             onClick={handleAddType}
                                             disabled={isSubmittingType || !newTypeName.trim()}
-                                            className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50 transition"
+                                            className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50 transition cursor-pointer"
                                         >
                                             Thêm
                                         </button>
@@ -389,7 +487,7 @@ export function CreateRoomModal({ onClose, onCreate }) {
                                 </div>
 
                                 {/* Danh sách */}
-                                <div className="max-h-40 overflow-y-auto bg-white border rounded-lg p-2 space-y-1">
+                                <div className="max-h-40 overflow-y-auto bg-white border rounded-lg p-2 space-y-1 custom-scrollbar">
                                     {roomTypes.length === 0 ? (
                                         <p className="text-center text-xs text-gray-400 py-2">
                                             Chưa có loại phòng nào
@@ -482,35 +580,60 @@ export function CreateRoomModal({ onClose, onCreate }) {
                         )}
                     </div>
 
-                    {/* Khung sơ đồ ghế (Fetch từ API) */}
-                    <div className="mb-2">
+                    {/* Khung sơ đồ ghế */}
+                    <div className="mb-2 bg-gray-50 p-4 rounded-xl border border-gray-200">
                         <label className="text-sm font-medium text-gray-700 mb-1 block">
-                            Khung sơ đồ ghế <span className="text-red-500">*</span>
+                            Khung sơ đồ ghế {!isEdit && <span className="text-red-500">*</span>}
                         </label>
                         <select
-                            className="w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition bg-white"
-                            value={layoutId}
+                            className={`w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 transition ${
+                                isEdit
+                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    : 'bg-white cursor-pointer'
+                            }`}
+                            value={layoutId || ''}
                             onChange={(e) => setLayoutId(e.target.value)}
+                            disabled={isEdit} // Khóa ô này nếu đang ở chế độ Sửa
                         >
                             <option value="" disabled>
                                 -- Chọn mẫu sơ đồ --
                             </option>
+
+                            {/* Nếu đang sửa mà layout cũ không nằm trong danh sách active, vẫn hiển thị tên của nó */}
+                            {isEdit &&
+                                layoutId &&
+                                !layouts.find((l) => (l.layout_id || l.id) == layoutId) && (
+                                    <option value={layoutId}>
+                                        {roomData?.seat_layout_name ||
+                                            `Sơ đồ hiện tại (ID: ${layoutId})`}
+                                    </option>
+                                )}
+
                             {layouts.map((l) => (
                                 <option key={l.layout_id || l.id} value={l.layout_id || l.id}>
                                     {l.name}
                                 </option>
                             ))}
                         </select>
-                        {layoutId && (
-                            <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
-                                Sức chứa ước tính:{' '}
-                                <span className="font-bold text-gray-700">
-                                    {calculatedCapacity > 0
-                                        ? `${calculatedCapacity} ghế`
-                                        : 'Chưa xác định'}
-                                </span>
+
+                        {isEdit ? (
+                            <p className="text-xs text-red-500 mt-2 font-medium bg-red-50 p-2 rounded-lg border border-red-100">
+                                🔒 Không thể thay đổi sơ đồ ghế của phòng đã tạo. Vui lòng dùng chức
+                                năng <b>"Cấu hình sơ đồ ghế"</b> ở ngoài danh sách nếu muốn tùy
+                                chỉnh.
                             </p>
+                        ) : (
+                            layoutId && (
+                                <p className="text-sm text-gray-500 mt-2 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+                                    Sức chứa ước tính:{' '}
+                                    <span className="font-bold text-gray-700">
+                                        {calculatedCapacity > 0
+                                            ? `${calculatedCapacity} ghế`
+                                            : 'Chưa xác định'}
+                                    </span>
+                                </p>
+                            )
                         )}
                     </div>
                 </div>
@@ -519,16 +642,20 @@ export function CreateRoomModal({ onClose, onCreate }) {
                 <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-2xl">
                     <button
                         onClick={onClose}
-                        className="px-5 py-2.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition"
+                        className="px-5 py-2.5 text-sm font-medium border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition cursor-pointer"
                     >
                         Hủy thao tác
                     </button>
                     <button
-                        onClick={handleCreate}
+                        onClick={handleSubmit}
                         disabled={isCreating}
-                        className="px-6 py-2.5 text-sm font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 active:scale-95 transition flex items-center gap-2"
+                        className="px-6 py-2.5 text-sm font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 active:scale-95 transition flex items-center gap-2 cursor-pointer"
                     >
-                        {isCreating ? 'Đang tạo phòng...' : 'Khởi tạo phòng chiếu'}
+                        {isCreating
+                            ? 'Đang xử lý...'
+                            : isEdit
+                              ? 'Cập nhật phòng'
+                              : 'Khởi tạo phòng chiếu'}
                     </button>
                 </div>
             </div>

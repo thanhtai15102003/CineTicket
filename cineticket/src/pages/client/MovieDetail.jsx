@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useCinema } from '../../components/CinemaContext'; // Lấy Context vào
 import RevealOnScroll from '../../components/common/RevealOnScroll'; // Nhớ import
+import LoadingSpinner from '../../components/common/LoadingSpinner'; // Thêm import LoadingSpinner
 
 const DAY_NAMES = ['CN', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
 
@@ -203,7 +204,6 @@ const MovieDetail = () => {
 
                 const newShowtimes = {};
                 rawData.forEach((cinema) => {
-                    // FIX LỖI Ở ĐÂY: Dùng .filter() để chỉ lấy đúng suất chiếu của ngày currentDateStr
                     const validSlotsForToday = (cinema.showtimes || []).filter(
                         (slot) => slot.show_date === currentDateStr
                     );
@@ -254,11 +254,18 @@ const MovieDetail = () => {
     const isVipSlot = (slotTime) => ['21:30', '23:00', '20:00'].includes(slotTime);
     const isSoldSlot = (slotTime) => ['09:00', '10:30'].includes(slotTime);
 
+    // Thêm hàm kiểm tra suất đêm (Từ 20:00 đến trước 04:00 sáng hôm sau)
+    const isNightSlot = (slotTime) => {
+        if (!slotTime) return false;
+        const hour = parseInt(slotTime.split(':')[0], 10);
+        return hour >= 20 || hour < 4;
+    };
+
     // ================= RENDER =================
     if (loading)
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-                <div className="w-10 h-10 border-4 border-zinc-800 border-t-red-600 rounded-full animate-spin"></div>
+                <LoadingSpinner isDark={true} />
             </div>
         );
     if (!movie)
@@ -270,17 +277,25 @@ const MovieDetail = () => {
 
     return (
         <div className="bg-zinc-950 text-white min-h-screen">
-            {/* ================= BANNER ================= */}
-            <div className="relative h-[400px] md:h-[550px] overflow-hidden">
+            <div className="relative h-[400px] md:h-[550px] bg-zinc-950 overflow-hidden">
+                {/* 1. ẢNH GỐC (Cố tình làm mờ nhẹ để giấu vỡ hạt, kết hợp scale để không bị lộ viền mờ) */}
                 <div
-                    className="absolute inset-0 bg-cover bg-center"
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 blur-md scale-105 opacity-80"
                     style={{ backgroundImage: `url(${movie.backdrop_url})` }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/60 to-transparent" />
 
+                {/* 2. GRADIENT DƯỚI LÊN */}
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+
+                {/* 3. GRADIENT TRÁI SANG */}
+                <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/70 via-transparent to-transparent" />
+
+                {/* 4. GRADIENT TRÊN XUỐNG */}
+                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-zinc-950/80 to-transparent" />
+
+                {/* Nút Play */}
                 {movie.trailer_url && (
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
                         <button
                             onClick={() => setOpenTrailer(true)}
                             className="group relative w-20 h-20 rounded-full bg-red-600/80 backdrop-blur-sm flex items-center justify-center shadow-[0_0_30px_rgba(220,38,38,0.5)] border border-white/20 transition-all duration-300 hover:scale-110 hover:bg-red-600"
@@ -543,11 +558,26 @@ const MovieDetail = () => {
 
                     <div className="h-[1px] w-full bg-zinc-800 mb-8 rounded" />
 
+                    {/* ================= CHÚ THÍCH PHÂN LOẠI SUẤT CHIẾU (LEGEND) ================= */}
+                    <div className="flex flex-wrap gap-6 mb-8 text-xs font-medium text-zinc-400 bg-zinc-900/40 p-4 rounded-2xl border border-white/5 w-fit">
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded bg-zinc-800 border border-zinc-700"></div>
+                            <span>Suất chiếu thường</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="relative w-4 h-4 rounded bg-indigo-900 border border-indigo-500/50 overflow-hidden">
+                                <span className="absolute -top-1 -right-1 text-[8px]">✨</span>
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                            </div>
+                            <span>Suất chiếu đêm (sau 20:00)</span>
+                        </div>
+                    </div>
+
                     {/* ===== SHOWTIME LIST ===== */}
                     <div className="relative z-10 flex flex-col gap-5">
                         {isLoadingShowtimes ? (
-                            <div className="py-12 text-center text-zinc-500">
-                                Đang tải lịch chiếu...
+                            <div className="py-20 flex justify-center">
+                                <LoadingSpinner isDark={true} />
                             </div>
                         ) : displayedCinemas.length === 0 ? (
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl py-12 text-center">
@@ -586,7 +616,7 @@ const MovieDetail = () => {
                                         </div>
                                         <div className="px-6 py-6 flex flex-wrap gap-4">
                                             {(showtimes[c.id] || []).map((slotObj) => {
-                                                // Lấy ra chuỗi HH:mm để dùng trong hàm check VIP/Sold của bạn
+                                                // Lấy ra chuỗi HH:mm
                                                 const timeStr = slotObj.start_time
                                                     ? slotObj.start_time.substring(0, 5)
                                                     : '';
@@ -600,16 +630,34 @@ const MovieDetail = () => {
                                                             )
                                                         }
                                                         disabled={isSoldSlot(timeStr)}
-                                                        className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300
+                                                        className={`relative px-6 py-3 rounded-xl text-sm font-bold tracking-wider border transition-all duration-300 overflow-hidden group
                                                             ${
                                                                 isSoldSlot(timeStr)
                                                                     ? 'border-white/5 bg-white/5 text-zinc-600 line-through cursor-not-allowed'
-                                                                    : isVipSlot(timeStr)
-                                                                      ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
-                                                                      : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
+                                                                    : isNightSlot(timeStr)
+                                                                      ? 'border-indigo-500/50 bg-gradient-to-br from-indigo-950 to-purple-900 text-indigo-200 shadow-[0_0_15px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)] hover:text-white hover:border-indigo-400'
+                                                                      : isVipSlot(timeStr)
+                                                                        ? 'border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white shadow-[0_0_15px_rgba(220,38,38,0.2)]'
+                                                                        : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-white hover:text-black hover:bg-white'
                                                             }`}
                                                     >
-                                                        {timeStr}
+                                                        {/* Icon lấp lánh góc phải trên cho suất tối */}
+                                                        {!isSoldSlot(timeStr) &&
+                                                            isNightSlot(timeStr) && (
+                                                                <span className="absolute -top-1.5 -right-1.5 text-[10px] animate-pulse drop-shadow-[0_0_8px_rgba(168,85,247,1)]">
+                                                                    ✨
+                                                                </span>
+                                                            )}
+
+                                                        <span className="relative z-10">
+                                                            {timeStr}
+                                                        </span>
+
+                                                        {/* Hiệu ứng dải sáng lướt qua khi hover chuột (Chỉ dành cho suất tối) */}
+                                                        {!isSoldSlot(timeStr) &&
+                                                            isNightSlot(timeStr) && (
+                                                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[150%] group-hover:translate-x-[150%] transition-transform duration-700 ease-in-out"></div>
+                                                            )}
                                                     </button>
                                                 );
                                             })}
