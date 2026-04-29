@@ -1,7 +1,7 @@
-import { useState } from 'react'; // BỔ SUNG useState
+import { useState } from 'react';
 import { IconArmchair, IconArmchair2, IconSofa } from '@tabler/icons-react';
 import { XCircle } from 'lucide-react';
-import Toast from './common/Toast'; // BỔ SUNG TOAST (Nhớ check lại đường dẫn tùy cấu trúc thư mục của bạn)
+import Toast from './common/Toast';
 
 const SeatMap = ({
     seatLayout = [],
@@ -9,40 +9,69 @@ const SeatMap = ({
     selectedSeats = [],
     onSeatSelect,
     heldSeats = [],
-    timer = 0,
     prices
 }) => {
-    // STATE QUẢN LÝ TOAST
     const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
     const showToast = (message, type = 'error') => setToast({ show: true, message, type });
 
     const soldSet = new Set(initialSoldSeats);
 
     const isSelected = (seatId) => selectedSeats.some((s) => s.id === seatId);
-    const isHeld = (seatId) => heldSeats.includes(seatId);
+
+    // 🌟 CHỈ KIỂM TRA ĐÚNG CHỮ (LABEL) - BỎ QUA CÁI ID LỘN XỘN CỦA BACKEND
+    const isHeld = (seat) => {
+        if (!seat) return false;
+        const labelStr = seat.displayLabel ? String(seat.displayLabel).trim() : '';
+
+        return heldSeats.some((h) => {
+            return String(h).trim() === labelStr;
+        });
+    };
+
+    const isSold = (seat) => {
+        if (!seat) return false;
+        if (isHeld(seat)) return false; // Ghế đang giữ thì cấm bôi xám
+
+        const labelStr = seat.displayLabel ? String(seat.displayLabel).trim() : '';
+
+        return initialSoldSeats.some((s) => {
+            const soldItem = String(s.seat_label || s.id || s).trim();
+            return soldItem === labelStr;
+        });
+    };
 
     const getPrice = (type) => {
         if (!prices) return 0;
-        if (type === 'double') return prices.double || 0; // Giá cả cặp ghế đôi
+        if (type === 'double') return prices.double || 0;
         if (type === 'vip') return prices.vip || 0;
-        return prices.single || 0; // Giá ghế thường
+        return prices.single || 0;
     };
 
-    // ================== HÀM ĐẾM SỐ LƯỢNG GHẾ TRỐNG BỊ KẸP GIỮA (SANDWICHED ORPHAN) ==================
+    // TIỀN XỬ LÝ MẢNG GHẾ
+    const processedLayout = seatLayout.map((row) => {
+        let counter = 1;
+        const newSeats = row.seats.map((seat) => {
+            const isRealSeat = seat.type && seat.type !== 'aisle';
+            return {
+                ...seat,
+                displayLabel: isRealSeat ? `${row.label}${counter++}` : seat.id
+            };
+        });
+        return { ...row, seats: newSeats };
+    });
+
     const countSandwichedOrphans = (row, currentSelectedIds) => {
         let orphans = 0;
 
-        // Xem ghế là bị "Chặn" nếu đã bán, đang giữ, bị hỏng, hoặc đang được chọn
         const isBlocked = (seat) => {
             return (
-                soldSet.has(seat.id) ||
-                isHeld(seat.id) ||
+                isSold(seat) ||
+                isHeld(seat) ||
                 seat.type === 'broken' ||
-                currentSelectedIds.includes(seat.id)
+                currentSelectedIds.includes(seat.displayLabel)
             );
         };
 
-        // Tách hàng thành các block liền kề (bỏ qua khoảng trống/lối đi để tính toán chính xác)
         let currentBlock = [];
         const blocks = [];
         for (let s of row.seats) {
@@ -57,7 +86,6 @@ const SeatMap = ({
         }
         if (currentBlock.length > 0) blocks.push(currentBlock);
 
-        // Kiểm tra từng block xem có ghế trống nào bị kẹp giữa 2 ghế Blocked không
         for (let block of blocks) {
             for (let i = 0; i < block.length; i++) {
                 const seat = block[i];
@@ -81,40 +109,38 @@ const SeatMap = ({
             !seat.type ||
             seat.type === 'aisle' ||
             seat.type === 'broken' ||
-            soldSet.has(seat.id) ||
-            isHeld(seat.id)
+            isSold(seat) ||
+            isHeld(seat)
         ) {
             return;
         }
 
         const isDouble = seat.type === 'double';
+        const seatLabelToSend = seat.displayLabel;
 
-        // 🚨 CHUẨN NGHIỆP VỤ 1: Giới hạn tối đa 8 vé / 1 giao dịch
-        const isAlreadySelected = isSelected(seat.id);
+        const isAlreadySelected = isSelected(seatLabelToSend);
         if (!isAlreadySelected) {
             const seatsToAdd = isDouble ? 2 : 1;
             if (selectedSeats.length + seatsToAdd > 8) {
-                // THAY THẾ ALERT BẰNG TOAST
                 showToast('Quy định rạp: Bạn chỉ được mua tối đa 8 vé trong một giao dịch!');
                 return;
             }
         }
 
-        // 🚨 CHUẨN NGHIỆP VỤ 2: Luật chống ghế mồ côi kẹp giữa (Sandwiched Orphan Rule)
         const currentSelectedIds = selectedSeats.map((s) => s.id);
         let newSelectedIds = [...currentSelectedIds];
 
         if (isAlreadySelected) {
-            newSelectedIds = newSelectedIds.filter((id) => id !== seat.id);
+            newSelectedIds = newSelectedIds.filter((id) => id !== seatLabelToSend);
             if (isDouble && seat.pair !== null && seat.pair !== undefined) {
-                const pairId = row.seats[seat.pair].id;
-                newSelectedIds = newSelectedIds.filter((id) => id !== pairId);
+                const pairSeat = row.seats[seat.pair];
+                newSelectedIds = newSelectedIds.filter((id) => id !== pairSeat.displayLabel);
             }
         } else {
-            newSelectedIds.push(seat.id);
+            newSelectedIds.push(seatLabelToSend);
             if (isDouble && seat.pair !== null && seat.pair !== undefined) {
-                const pairId = row.seats[seat.pair].id;
-                newSelectedIds.push(pairId);
+                const pairSeat = row.seats[seat.pair];
+                newSelectedIds.push(pairSeat.displayLabel);
             }
         }
 
@@ -122,24 +148,32 @@ const SeatMap = ({
         const orphansAfter = countSandwichedOrphans(row, newSelectedIds);
 
         if (orphansAfter > orphansBefore) {
-            // THAY THẾ ALERT BẰNG TOAST
             showToast('Quy định rạp: Không được để trống 1 ghế ở giữa 2 ghế khác!');
             return;
         }
 
         if (isDouble && seat.pair !== null && seat.pair !== undefined) {
             const pairSeat = row.seats[seat.pair];
-            if (soldSet.has(pairSeat.id)) return;
+            if (isSold(pairSeat)) return;
 
-            // Với ghế đôi, ta chia đôi giá trị để khi Booking.jsx tính tổng (reduce price) sẽ ra đúng giá 1 cặp
             const halfPrice = getPrice('double') / 2;
 
-            onSeatSelect({ id: seat.id, label: seat.id, price: halfPrice, type: 'double' });
-            onSeatSelect({ id: pairSeat.id, label: pairSeat.id, price: halfPrice, type: 'double' });
+            onSeatSelect({
+                id: seatLabelToSend,
+                label: seatLabelToSend,
+                price: halfPrice,
+                type: 'double'
+            });
+            onSeatSelect({
+                id: pairSeat.displayLabel,
+                label: pairSeat.displayLabel,
+                price: halfPrice,
+                type: 'double'
+            });
         } else {
             onSeatSelect({
-                id: seat.id,
-                label: seat.id,
+                id: seatLabelToSend,
+                label: seatLabelToSend,
                 price: getPrice(seat.type),
                 type: seat.type
             });
@@ -156,7 +190,6 @@ const SeatMap = ({
 
     return (
         <div className="bg-zinc-900 p-6 md:p-10 rounded-2xl shadow-lg overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {/* COMPONENT TOAST THÔNG BÁO LỖI */}
             {toast.show && (
                 <Toast
                     message={toast.message}
@@ -165,23 +198,19 @@ const SeatMap = ({
                 />
             )}
 
-            {/* SCREEN */}
             <div className="min-w-[600px] w-full max-w-[700px] mx-auto mb-12">
                 <div className="bg-gradient-to-r from-zinc-600 to-zinc-400 text-center py-2.5 rounded-t-full text-xs tracking-[0.4em] text-black font-bold shadow-[0_-5px_20px_rgba(255,255,255,0.1)]">
                     MÀN HÌNH
                 </div>
             </div>
 
-            {/* SEATS */}
             <div className="flex flex-col items-center gap-4 min-w-max mx-auto pb-6">
-                {seatLayout.map((row, rIndex) => (
+                {processedLayout.map((row, rIndex) => (
                     <div key={row.label || rIndex} className="flex items-center gap-4">
-                        {/* ROW LABEL LEFT */}
                         <div className="w-6 font-bold text-zinc-500 text-sm text-center">
                             {row.label}
                         </div>
 
-                        {/* ROW SEATS GRID */}
                         <div
                             className="grid gap-2"
                             style={{
@@ -194,7 +223,6 @@ const SeatMap = ({
                                 const isAisle = seat.type === 'aisle';
                                 const isBroken = seat.type === 'broken';
 
-                                // Ẩn nửa bên phải của ghế đôi đi để gộp span 2
                                 if (
                                     isDouble &&
                                     seat.pair !== null &&
@@ -204,16 +232,18 @@ const SeatMap = ({
                                     return null;
                                 }
 
-                                // Trạng thái ghế
                                 const sold = isDouble
-                                    ? soldSet.has(seat.id) || soldSet.has(row.seats[seat.pair]?.id)
-                                    : soldSet.has(seat.id);
+                                    ? isSold(seat) || isSold(row.seats[seat.pair])
+                                    : isSold(seat);
 
                                 const selected = isDouble
-                                    ? isSelected(seat.id) && isSelected(row.seats[seat.pair]?.id)
-                                    : isSelected(seat.id);
+                                    ? isSelected(seat.displayLabel) &&
+                                      isSelected(row.seats[seat.pair]?.displayLabel)
+                                    : isSelected(seat.displayLabel);
 
-                                const held = isHeld(seat.id);
+                                const held = isDouble
+                                    ? isHeld(seat) || isHeld(row.seats[seat.pair])
+                                    : isHeld(seat);
 
                                 let stateClass = '';
                                 let cursorClass = 'cursor-pointer';
@@ -221,17 +251,19 @@ const SeatMap = ({
                                 if (!seat.type || isAisle) {
                                     cursorClass = 'cursor-default';
                                 } else if (isBroken) {
-                                    stateClass = 'text-red-900/50'; // Màu đỏ sẫm mờ cho ghế bảo trì
+                                    stateClass = 'text-red-900/50';
+                                    cursorClass = 'cursor-not-allowed';
+                                } else if (held) {
+                                    // 🌟 ƯU TIÊN KIỂM TRA HELD TRƯỚC SOLD (Bóp nghẹt lỗi BE gửi nhầm vào mảng sold)
+                                    stateClass =
+                                        'text-yellow-500 animate-pulse drop-shadow-[0_0_8px_rgba(234,179,8,0.6)]';
                                     cursorClass = 'cursor-not-allowed';
                                 } else if (sold) {
                                     stateClass = 'text-zinc-700';
                                     cursorClass = 'cursor-not-allowed';
                                 } else if (selected) {
-                                    // Chỉnh lại màu đỏ đậm hơn, phóng to hơn, và hiệu ứng glow đỏ mạnh hơn
                                     stateClass =
                                         'text-red-600 scale-115 drop-shadow-[0_0_12px_rgba(239,68,68,1)]';
-                                } else if (held) {
-                                    stateClass = 'text-yellow-400';
                                 } else {
                                     stateClass = 'text-zinc-400 hover:text-white hover:scale-105';
                                     if (isDouble)
@@ -242,6 +274,10 @@ const SeatMap = ({
                                             'text-orange-400 hover:text-orange-300 hover:scale-105';
                                 }
 
+                                const pairDisplayLabel = isDouble
+                                    ? row.seats[seat.pair]?.displayLabel
+                                    : '';
+
                                 return (
                                     <div
                                         key={`${row.label}${sIndex}`}
@@ -249,7 +285,6 @@ const SeatMap = ({
                                         style={{ gridColumn: isDouble ? 'span 2' : 'auto' }}
                                         className={`relative flex items-center justify-center transition-all duration-200 group ${cursorClass}`}
                                     >
-                                        {/* ICON RENDER */}
                                         {seat.type && !isAisle && (
                                             <>
                                                 {isBroken ? (
@@ -274,12 +309,11 @@ const SeatMap = ({
                                                     />
                                                 )}
 
-                                                {/* TOOLTIP HIỂN THỊ TÊN GHẾ */}
                                                 {!sold && !isBroken && (
                                                     <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded bg-black border border-zinc-700 text-white opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap z-10">
                                                         {isDouble
-                                                            ? `${seat.id}, ${row.seats[seat.pair]?.id}`
-                                                            : seat.id}
+                                                            ? `${seat.displayLabel}, ${pairDisplayLabel}`
+                                                            : seat.displayLabel}
                                                     </div>
                                                 )}
                                             </>
@@ -289,7 +323,6 @@ const SeatMap = ({
                             })}
                         </div>
 
-                        {/* ROW LABEL RIGHT */}
                         <div className="w-6 font-bold text-zinc-500 text-sm text-center">
                             {row.label}
                         </div>
@@ -297,7 +330,6 @@ const SeatMap = ({
                 ))}
             </div>
 
-            {/* LEGEND */}
             <div className="flex flex-wrap justify-center gap-6 mt-8 pt-6 border-t border-zinc-800 text-xs text-zinc-300">
                 <div className="flex items-center gap-2">
                     <IconArmchair size={20} className="text-red-600" /> Đang chọn
@@ -314,10 +346,12 @@ const SeatMap = ({
                 <div className="flex items-center gap-2">
                     <XCircle size={20} className="text-red-900/50" /> Bảo trì
                 </div>
+                <div className="flex items-center gap-2">
+                    <IconArmchair size={20} className="text-yellow-500 animate-pulse" /> Đang giữ
+                </div>
             </div>
         </div>
     );
-};
+};;;
 
 export default SeatMap;
-

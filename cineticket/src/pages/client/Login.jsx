@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+
 
 const Login = () => {
     const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
+    const location = useLocation();
 
     // ==================== STATE QUẢN LÝ THÔNG BÁO (TOAST) ====================
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
@@ -65,17 +67,23 @@ const Login = () => {
                 showToast(`Đăng nhập thành công! Chào mừng ${result.user.full_name}`, 'success');
 
                 // ======================================================
-                // TÍCH HỢP PHÂN QUYỀN ĐIỀU HƯỚNG (ROLE-BASED REDIRECT)
+                // 🌟 FIX: ƯU TIÊN TRẢ VỀ TRANG CŨ TRƯỚC KHI ĐĂNG NHẬP
                 // ======================================================
                 const userRole =
                     result.user?.role?.role_name?.toLowerCase() ||
                     result.user?.role?.toLowerCase() ||
                     'user';
 
-                let targetPath = '/'; // Mặc định là trang chủ cho Khách hàng
+                // Đọc đường link cũ từ Booking.jsx truyền sang (nếu có)
+                const fromPath = location.state?.from;
 
-                // NẾU LÀ ADMIN HOẶC MANAGER THÌ VÀO TRANG QUẢN TRỊ CHUNG
-                if (userRole === 'admin' || userRole === 'manager') {
+                let targetPath = '/'; // Mặc định là trang chủ
+
+                if (fromPath) {
+                    // Ưu tiên 1: Nếu bị đá văng từ trang Booking -> Trả về đúng trang Booking đó
+                    targetPath = fromPath;
+                } else if (userRole === 'admin' || userRole === 'manager') {
+                    // Ưu tiên 2: Nếu login bình thường và là Admin -> Vào trang quản trị
                     targetPath = '/dashboard';
                 }
 

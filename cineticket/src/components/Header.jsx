@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useCinema } from './CinemaContext';
+import { useCinema } from '../components/CinemaContext';
 
 const Header = () => {
     // Cinema Context
@@ -22,8 +22,6 @@ const Header = () => {
     });
 
     const [scrolled, setScrolled] = useState(false);
-
-    // Dùng để điều khiển Tab Thành phố đang được active trong bảng chọn rạp
     const [activeCityTab, setActiveCityTab] = useState(null);
 
     const loadUser = () => {
@@ -50,7 +48,6 @@ const Header = () => {
                     'https://cinema-api-production-f2bc.up.railway.app/api/v1/cinemas'
                 );
                 const dataArray = await response.json();
-
                 const groupedData = {};
 
                 dataArray.forEach((cinema) => {
@@ -86,7 +83,6 @@ const Header = () => {
         loadUser();
     }, [location.pathname]);
 
-    // Đồng bộ tab thành phố với lựa chọn hiện tại để khi mở menu lên nó focus đúng chỗ
     useEffect(() => {
         if (selectedRegion && selectedRegion !== 'Đang tải...' && !activeCityTab) {
             setActiveCityTab(selectedRegion);
@@ -108,9 +104,105 @@ const Header = () => {
         localStorage.setItem('selectedRegion', city);
     };
 
-    // Xác định thành phố đang được hiển thị trong bảng Menu
     const displayCity = activeCityTab || selectedRegion || Object.keys(cinemasByCity)[0];
 
+    // =========================================================================
+    // 🌟 PHẦN NÂNG CẤP: KIỂM TRA LUỒNG ĐẶT VÉ VÀ XỬ LÝ HỦY GIAO DỊCH
+    // =========================================================================
+    const isBookingFlow =
+        location.pathname.includes('/booking') ||
+        location.pathname.includes('/combo') ||
+        location.pathname.includes('/payment');
+
+    const handleCancelTransaction = async () => {
+        const confirmCancel = window.confirm(
+            'Bạn có chắc chắn muốn hủy giao dịch này? Các ghế đã chọn sẽ bị hủy bỏ.'
+        );
+        if (confirmCancel) {
+            // 1. Tìm showtimeId từ URL để gọi API nhả ghế (nếu có)
+            const match = location.pathname.match(/\/(?:booking|combo|payment)\/(\d+)/);
+            const showtimeId = match ? match[1] : null;
+
+            let token = localStorage.getItem('token');
+            if (token) token = token.replace(/^"|"$/g, '');
+            const selectedSeats = JSON.parse(localStorage.getItem('selectedSeats') || '[]');
+
+            // 2. Gọi API nhả ghế nếu đang giữ ghế
+            if (showtimeId && token && selectedSeats.length > 0) {
+                try {
+                    await fetch(
+                        `https://cinema-api-production-f2bc.up.railway.app/api/v1/showtimes/${showtimeId}/holds`,
+                        {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Authorization: `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ seat_labels: selectedSeats.map((s) => s.id) })
+                        }
+                    );
+                } catch (error) {
+                    console.error('Lỗi khi nhả ghế:', error);
+                }
+            }
+
+            // 3. Xóa sạch dữ liệu giỏ hàng trong LocalStorage
+            localStorage.removeItem('selectedSeats');
+            localStorage.removeItem('bookingMovie');
+            localStorage.removeItem('bookingShowtime');
+            localStorage.removeItem('selectedCombos');
+
+            // 4. Đá về trang chủ
+            navigate('/');
+        }
+    };
+
+    // 🌟 NẾU ĐANG Ở TRANG ĐẶT VÉ -> RENDER HEADER TỐI GIẢN
+    if (isBookingFlow) {
+        return (
+            <header className="fixed top-0 w-full bg-zinc-950 border-b border-zinc-800 z-50 shadow-lg">
+                <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+                    {/* LOGO */}
+                    <div className="flex items-center gap-3">
+                        <div className="relative w-10 h-10 bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center -skew-x-6 rounded-lg shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+                            <span className="text-white font-black text-xl italic tracking-tighter">
+                                CT
+                            </span>
+                        </div>
+                        <h1 className="text-xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-zinc-400">
+                            CINETICKET
+                        </h1>
+                    </div>
+
+                    {/* NÚT HỦY GIAO DỊCH */}
+                    <button
+                        onClick={handleCancelTransaction}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-full transition-all duration-300 font-semibold text-sm border border-red-500/30"
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M18 6 6 18" />
+                            <path d="m6 6 12 12" />
+                        </svg>
+                        Hủy giao dịch
+                    </button>
+                </div>
+            </header>
+        );
+    }
+
+    // =========================================================================
+    // NẾU LÀ CÁC TRANG BÌNH THƯỜNG -> RENDER HEADER FULL MẶC ĐỊNH
+    // =========================================================================
     return (
         <header
             className={`fixed top-0 w-full z-50 transition-all duration-300 border-b ${
@@ -201,7 +293,7 @@ const Header = () => {
 
                     {/* RIGHT SIDE: REGION + USER */}
                     <div className="flex items-center gap-6 flex-shrink-0">
-                        {/* ======================= REGION SELECTOR (DESKTOP - KIỂU TAB MEGA MENU) ======================= */}
+                        {/* ======================= REGION SELECTOR ======================= */}
                         <div className="hidden md:block relative group cursor-pointer z-50">
                             {/* Trigger Button */}
                             <div className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors duration-200 py-4">
@@ -245,10 +337,9 @@ const Header = () => {
                                 </svg>
                             </div>
 
-                            {/* Bảng Dropdown kiểu Tabs */}
+                            {/* Bảng Dropdown */}
                             <div className="absolute top-[85%] right-0 w-[420px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out pt-3 origin-top-right">
                                 <div className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-                                    {/* Tab Thành phố (Cuộn ngang) */}
                                     <div className="bg-black/40 border-b border-white/5 px-2 py-2 flex gap-1 overflow-x-auto custom-scrollbar">
                                         {Object.keys(cinemasByCity).map((city) => (
                                             <div
@@ -261,8 +352,6 @@ const Header = () => {
                                             </div>
                                         ))}
                                     </div>
-
-                                    {/* Danh sách rạp theo Tab Thành phố đang chọn */}
                                     <div className="p-3 max-h-[300px] overflow-y-auto custom-scrollbar flex flex-col gap-1.5">
                                         {cinemasByCity[displayCity]?.map((cinema) => {
                                             const isSelected =
@@ -279,7 +368,6 @@ const Header = () => {
                                                 >
                                                     <div className="flex flex-col gap-0.5">
                                                         <span>{cinema.cinema_name}</span>
-                                                        {/* Có thể bổ sung địa chỉ rạp ở đây nếu data có */}
                                                         {cinema.address && (
                                                             <span className="text-[10px] text-zinc-500 font-normal truncate max-w-[280px]">
                                                                 {cinema.address}
@@ -337,7 +425,6 @@ const Header = () => {
                                                 </p>
                                             </div>
                                         </div>
-
                                         <Link
                                             to="/profile"
                                             state={{ targetTab: 'Thông Tin Cá Nhân' }}
@@ -359,7 +446,6 @@ const Header = () => {
                                             </svg>
                                             Tài khoản
                                         </Link>
-
                                         <Link
                                             to="/profile"
                                             state={{ targetTab: 'Lịch Sử Giao Dịch' }}
@@ -381,9 +467,7 @@ const Header = () => {
                                             </svg>
                                             Lịch sử đặt vé
                                         </Link>
-
                                         <div className="border-t border-white/5 my-1"></div>
-
                                         <button
                                             onClick={handleLogout}
                                             className="w-full text-left px-3 py-2.5 text-sm font-medium text-red-500 hover:bg-red-500/10 rounded-xl transition-colors flex items-center gap-3"
@@ -435,16 +519,11 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* ======================= MOBILE MENU (RESPONSIVE - TAB KIỂU MỚI) ======================= */}
+            {/* MOBILE MENU */}
             <div
-                className={`lg:hidden overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${
-                    isMenuOpen
-                        ? 'max-h-[85vh] opacity-100 border-b border-white/10'
-                        : 'max-h-0 opacity-0'
-                }`}
+                className={`lg:hidden overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-h-[85vh] opacity-100 border-b border-white/10' : 'max-h-0 opacity-0'}`}
             >
                 <div className="bg-zinc-950/95 backdrop-blur-2xl px-4 py-6 flex flex-col gap-6 shadow-2xl">
-                    {/* Menu links cơ bản */}
                     <div className="flex flex-col gap-2 text-[15px] font-semibold border-b border-white/5 pb-4">
                         {['Phim', 'Lịch chiếu', 'Rạp', 'Giá vé'].map((item, idx) => (
                             <Link
@@ -457,8 +536,6 @@ const Header = () => {
                             </Link>
                         ))}
                     </div>
-
-                    {/* KHU VỰC VÀ RẠP (MOBILE TAB / PILLS) */}
                     <div className="px-2">
                         <div className="flex items-center gap-2 mb-4">
                             <div className="w-1.5 h-4 bg-red-600 rounded-full"></div>
@@ -466,23 +543,18 @@ const Header = () => {
                                 Chọn Rạp Phim
                             </p>
                         </div>
-
                         <div className="flex flex-col gap-4">
-                            {/* Thanh cuộn ngang chọn Thành phố */}
                             <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
                                 {Object.keys(cinemasByCity).map((city) => (
                                     <button
                                         key={city}
                                         onClick={() => handleSelectRegion(city)}
-                                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 border
-                                            ${displayCity === city ? 'bg-red-600 text-white border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'bg-transparent text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'}`}
+                                        className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 border ${displayCity === city ? 'bg-red-600 text-white border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.3)]' : 'bg-transparent text-zinc-400 border-white/10 hover:bg-white/5 hover:text-white'}`}
                                     >
                                         {city}
                                     </button>
                                 ))}
                             </div>
-
-                            {/* Danh sách rạp hiển thị theo thành phố đã chọn */}
                             <div className="flex flex-col gap-2 bg-black/20 p-2 rounded-2xl border border-white/5 max-h-[40vh] overflow-y-auto custom-scrollbar">
                                 {cinemasByCity[displayCity]?.map((cinema) => {
                                     const isSelected =
@@ -493,14 +565,9 @@ const Header = () => {
                                             onClick={() => {
                                                 handleSelectCinema(cinema);
                                                 handleSelectRegion(displayCity);
-                                                setIsMenuOpen(false); // Chọn xong tự đóng menu
+                                                setIsMenuOpen(false);
                                             }}
-                                            className={`text-left px-4 py-3.5 text-sm rounded-xl font-medium transition-all duration-200 flex items-center justify-between
-                                                ${
-                                                    isSelected
-                                                        ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                                                        : 'bg-white/5 border border-transparent text-zinc-300 hover:bg-white/10 hover:text-white'
-                                                }`}
+                                            className={`text-left px-4 py-3.5 text-sm rounded-xl font-medium transition-all duration-200 flex items-center justify-between ${isSelected ? 'bg-red-500/10 border border-red-500/30 text-red-400' : 'bg-white/5 border border-transparent text-zinc-300 hover:bg-white/10 hover:text-white'}`}
                                         >
                                             <span className="truncate">{cinema.cinema_name}</span>
                                             {isSelected && (
