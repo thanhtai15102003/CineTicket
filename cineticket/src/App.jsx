@@ -8,6 +8,7 @@ import Booking from './pages/client/Booking';
 import Login from './pages/client/Login';
 import ComboPage from './pages/client/ComboPage';
 import Profile from './pages/client/Profile';
+import PaymentPage from './pages/client/PaymentPage';
 
     {/*------------Admin--------------- */}
 import AdminLayout from './layouts/AdminLayout';
@@ -84,6 +85,16 @@ function App() {
                     element={
                         <MainLayout>
                             <ComboPage />
+                        </MainLayout>
+                    }
+                />
+
+                {/* Trang thanh toán */}
+                <Route
+                    path="/payment/:showtimeId"
+                    element={
+                        <MainLayout>
+                            <PaymentPage />
                         </MainLayout>
                     }
                 />
