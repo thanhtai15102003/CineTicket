@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Save, ChevronLeft, MoveHorizontal } from 'lucide-react'; // 👈 Thêm MoveHorizontal
 import { IconArmchair, IconArmchair2, IconSofa, IconEraser } from '@tabler/icons-react'; // Xoá IconSpacingWidth
 import { useNavigate, useLocation } from 'react-router-dom';
-import Toast from '../../components/common/Toast';
+import Toast from '../../../../components/common/Toast';
 
 /* ================= GENERATE GRID ================= */
 const generateGrid = (rows, cols) => {

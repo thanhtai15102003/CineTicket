@@ -4,7 +4,6 @@ import SeatMap from '../../components/SeatMap';
 import BookingProgress from '../../components/BookingProgress';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import Toast from '../../components/common/Toast';
-import { Popcorn, Sparkles } from 'lucide-react';
 import echo from '../../utils/echo';
 
 const Booking = () => {
@@ -14,8 +13,6 @@ const Booking = () => {
 
     // 🌟 CỜ HIỆU ĐỂ DỌN RÁC NẾU THOÁT NGANG
     const isProceedingRef = useRef(false);
-    // 🌟 KHIÊN BẢO VỆ CHỐNG WEBSOCKET TỰ XÓA GHẾ KHI MÌNH ĐANG LƯU
-    const isHoldingRef = useRef(false);
 
     // State cho dữ liệu từ API
     const [showtime, setShowtime] = useState(null);
@@ -40,10 +37,7 @@ const Booking = () => {
     // State cho UI
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
-    // 🌟 STATE CHO GỢI Ý COMBO
-    const [showComboModal, setShowComboModal] = useState(false);
-    const [suggestedCombo, setSuggestedCombo] = useState(null);
+    const [showRulesModal, setShowRulesModal] = useState(false);
 
     const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
     const showToast = (message, type = 'error') => {
@@ -104,16 +98,6 @@ const Booking = () => {
                     throw new Error(showtimeJson.message || `Không tìm thấy suất chiếu.`);
 
                 const data = showtimeJson.data || showtimeJson;
-
-                // 🌟 LẤY ĐÚNG ID CỦA RẠP TỪ API SUẤT CHIẾU (Không dùng số mặc định)
-                const realCinemaId =
-                    data.cinema_id ||
-                    data.room?.cinema_id ||
-                    data.room?.cinema?.id ||
-                    data.room?.cinema?.cinema_id;
-
-                console.log('ID Rạp lấy được từ suất chiếu là:', realCinemaId);
-
                 setShowtime({
                     showtime_id: data.showtime_id,
                     start_time: data.start_time?.substring(0, 5),
@@ -121,7 +105,6 @@ const Booking = () => {
                     room: data.room?.room_name,
                     format: data.room?.room_type?.name,
                     cinema: data.room?.cinema?.cinema_name,
-                    cinema_id: realCinemaId, // Gán ID rạp thật vào đây
                     prices: {
                         single: data.price_standard,
                         vip: data.price_vip,
@@ -153,18 +136,22 @@ const Booking = () => {
     }, [showtimeId, navigate, location.pathname]);
 
     // ==========================================================
-    // EFFECT 2: LẮNG NGHE WEBSOCKET REAL-TIME CÓ BẬT KHIÊN
+    // EFFECT 2: LẮNG NGHE WEBSOCKET REAL-TIME TỪ REVERB
     // ==========================================================
     useEffect(() => {
         if (!showtimeId) return;
+
         const channel = echo.channel(`showtime.${showtimeId}`);
 
         channel.listen('.SeatStatusChanged', (data) => {
+            console.log('Cập nhật ghế Real-time:', data);
+
             const wsSeatId = String(data.seat_label || data.seat_id).trim();
             const statusStr = String(data.status).trim().toLowerCase();
 
             if (['held', 'active', 'hold', 'holding'].includes(statusStr)) {
                 setHeldSeats((prev) => [...new Set([...prev, wsSeatId])]);
+
                 setSoldSeats((prev) =>
                     prev.filter((s) => String(s.seat_label || s.id || s).trim() !== wsSeatId)
                 );
@@ -174,9 +161,7 @@ const Booking = () => {
                         (s) =>
                             String(s.id).trim() === wsSeatId || String(s.label).trim() === wsSeatId
                     );
-
-                    // 🌟 FIX BUG TẠI ĐÂY: Chỉ báo mất ghế nếu mình đang KHÔNG gọi API giữ ghế
-                    if (isMySeatHacked && !isHoldingRef.current && !isProceedingRef.current) {
+                    if (isMySeatHacked) {
                         showToast('Ghế bạn chọn vừa có người nhanh tay hơn giữ mất rồi!', 'error');
                         return prev.filter(
                             (s) =>
@@ -194,11 +179,13 @@ const Booking = () => {
             }
         });
 
-        return () => echo.leave(`showtime.${showtimeId}`);
+        return () => {
+            echo.leave(`showtime.${showtimeId}`);
+        };
     }, [showtimeId]);
 
     // ==========================================================
-    // CÁC HÀM XỬ LÝ CLICK GHẾ
+    // CÁC HÀM XỬ LÝ CLICK
     // ==========================================================
     const handleSeatSelect = (seat) => {
         const isAlreadySelected = selectedSeats.some((s) => s.id === seat.id);
@@ -223,18 +210,23 @@ const Booking = () => {
             selectedSeats.forEach((s) => {
                 const seatName = String(s.label || s.id || '');
                 if (!seatName) return;
+
                 const row = seatName.replace(/[0-9]/g, '');
                 const num = parseInt(seatName.replace(/[^0-9]/g, ''), 10);
+
                 if (isNaN(num)) return;
+
                 if (!rowMap[row]) rowMap[row] = [];
                 rowMap[row].push(num);
             });
 
             for (const row in rowMap) {
                 const nums = rowMap[row].sort((a, b) => a - b);
+
                 for (let i = 0; i < nums.length - 1; i++) {
                     if (nums[i + 1] - nums[i] === 2) {
                         const gapSeatLabel = `${row}${nums[i] + 1}`;
+
                         const isSoldOrHeld =
                             soldSeats.some(
                                 (s) =>
@@ -249,88 +241,25 @@ const Booking = () => {
             }
             return false;
         } catch (err) {
+            console.error('Lỗi thuật toán ghế mồ côi:', err);
             return false;
         }
     };
 
-    // ==========================================================
-    // THUẬT TOÁN TÌM COMBO PHÙ HỢP VÀ HIỂN THỊ MODAL
-    // ==========================================================
-    const handleContinueClick = async () => {
+    const handleContinueClick = () => {
         if (hasOrphanSeats()) {
             showToast('Quy định rạp: Không được để trống 1 ghế ở giữa 2 ghế khác!', 'error');
             return;
         }
-
-        setIsHolding(true);
-
-        try {
-            // LẤY ĐÚNG ID CỦA RẠP ĐANG CHIẾU
-            const targetCinemaId = showtime?.cinema_id;
-
-            if (!targetCinemaId) {
-                // Cảnh báo đỏ nếu Backend chưa trả về cinema_id
-                showToast('LỖI DỮ LIỆU: Không xác định được mã rạp (cinema_id)!', 'error');
-                confirmContinue(null);
-                return;
-            }
-
-            // GỌI API THEO ĐÚNG ID ĐỘNG CỦA RẠP
-            const res = await fetch(
-                `https://cinema-api-production-f2bc.up.railway.app/api/v1/combos?cinema_id=${targetCinemaId}`
-            );
-            const json = await res.json();
-
-            // Chuẩn hóa mảng dữ liệu
-            let comboList = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
-
-            // CHỈ GỢI Ý NHỮNG COMBO ĐANG BÁN THỰC TẾ TẠI RẠP (effective_status === 'active')
-            comboList = comboList.filter((c) => c.effective_status === 'active');
-
-            if (comboList.length > 0) {
-                const seatCount = selectedSeats.length;
-                let bestMatch = null;
-
-                bestMatch = comboList.find((c) => Number(c.target_audience) === seatCount);
-
-                if (!bestMatch) {
-                    if (seatCount === 3) {
-                        bestMatch = comboList.find((c) => Number(c.target_audience) === 2);
-                    } else if (seatCount >= 4) {
-                        bestMatch =
-                            comboList.find((c) => Number(c.target_audience) === 4) ||
-                            comboList.find((c) => Number(c.target_audience) === 2);
-                    }
-                }
-
-                if (!bestMatch) {
-                    bestMatch = comboList[0]; // Lấy tạm combo đầu tiên nếu không khớp
-                }
-
-                if (bestMatch) {
-                    setSuggestedCombo(bestMatch);
-                    setShowComboModal(true);
-                    setIsHolding(false);
-                    return;
-                }
-            }
-
-            confirmContinue(null);
-        } catch (error) {
-            console.error('Lỗi fetch combo gợi ý:', error);
-            confirmContinue(null);
-        }
+        setShowRulesModal(true);
     };
 
-    // ==========================================================
-    // GIỮ GHẾ VÀ ĐI TIẾP (CÓ BẬT KHIÊN BẢO VỆ)
-    // ==========================================================
-    const confirmContinue = async (selectedSuggestedCombo = null) => {
+    // 🌟 ĐÃ FIX API POST CHUẨN XÁC
+    const confirmContinue = async () => {
         let token = localStorage.getItem('token');
         if (token) token = token.replace(/^"|"$/g, '');
         if (!token) return;
 
-        isHoldingRef.current = true; // 🌟 BẬT KHIÊN BẢO VỆ CHỐNG WEBSOCKET
         setIsHolding(true);
         try {
             const response = await fetch(
@@ -353,31 +282,16 @@ const Booking = () => {
             localStorage.setItem('selectedSeats', JSON.stringify(selectedSeats));
             localStorage.setItem('bookingMovie', JSON.stringify(movie));
             localStorage.setItem('bookingShowtime', JSON.stringify(showtime));
+
+            // Lưu mốc thời gian hết hạn 7 phút
             localStorage.setItem('holdEndTime', Date.now() + 7 * 60 * 1000);
 
-            if (selectedSuggestedCombo) {
-                // Ưu tiên lưu giá thực tế rạp
-                const comboCart = [
-                    {
-                        ...selectedSuggestedCombo,
-                        price: Number(
-                            selectedSuggestedCombo.current_price ?? selectedSuggestedCombo.price
-                        ),
-                        quantity: 1
-                    }
-                ];
-                localStorage.setItem('selectedCombos', JSON.stringify(comboCart));
-            } else {
-                localStorage.removeItem('selectedCombos');
-            }
-
-            setShowComboModal(false);
-            isProceedingRef.current = true;
+            setShowRulesModal(false);
+            isProceedingRef.current = true; // Báo hiệu đi tiếp trang sau
             navigate(`/combo/${showtimeId}`);
         } catch (error) {
-            isHoldingRef.current = false; // 🌟 TẮT KHIÊN NẾU CÓ LỖI
             showToast(error.message, 'error');
-            setShowComboModal(false);
+            setShowRulesModal(false);
         } finally {
             setIsHolding(false);
         }
@@ -425,13 +339,14 @@ const Booking = () => {
                 />
             )}
 
+            {/* Giảm pt xuống pt-24 nếu bạn dùng Header tối giản fixed top */}
             <div className="max-w-6xl mx-auto px-6 pt-24 pb-8">
                 <BookingProgress />
 
                 <h1 className="text-3xl font-bold mb-2">{movie.title}</h1>
                 <p className="text-zinc-400">
-                    {showtime.cinema || 'Hệ thống rạp'} • {showtime.room} • {showtime.show_date} •{' '}
-                    {showtime.start_time}
+                    {showtime.cinema || 'Galaxy Nguyễn Du'} • {showtime.room} • {showtime.show_date}{' '}
+                    • {showtime.start_time}
                 </p>
 
                 <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-10">
@@ -448,7 +363,7 @@ const Booking = () => {
 
                     <div className="lg:col-span-4">
                         <div className="bg-zinc-900 p-6 rounded-2xl sticky top-24">
-                            <h3 className="text-lg font-semibold mb-4">Thông খুন đặt vé</h3>
+                            <h3 className="text-lg font-semibold mb-4">Thông tin đặt vé</h3>
 
                             <div className="flex items-start gap-4 mb-6">
                                 <img
@@ -514,15 +429,11 @@ const Booking = () => {
                                     Quay lại
                                 </button>
                                 <button
-                                    disabled={selectedSeats.length === 0 || isHolding}
-                                    className="flex-1 flex justify-center items-center gap-2 bg-orange-600 py-4 rounded-xl font-semibold text-lg disabled:bg-zinc-800 hover:bg-orange-700 transition shadow-[0_0_15px_rgba(234,88,12,0.3)] disabled:shadow-none"
+                                    disabled={selectedSeats.length === 0}
+                                    className="flex-1 bg-orange-600 py-4 rounded-xl font-semibold text-lg disabled:bg-zinc-700 hover:bg-orange-700 transition shadow-[0_0_15px_rgba(234,88,12,0.3)] disabled:shadow-none"
                                     onClick={handleContinueClick}
                                 >
-                                    {isHolding ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    ) : (
-                                        'Tiếp tục'
-                                    )}
+                                    Tiếp tục
                                 </button>
                             </div>
                         </div>
@@ -530,68 +441,81 @@ const Booking = () => {
                 </div>
             </div>
 
-            {/* 🌟 MODAL GỢI Ý COMBO UPSELL */}
-            {showComboModal && suggestedCombo && (
+            {/* MODAL QUY ĐỊNH RẠP */}
+            {showRulesModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 md:p-8 max-w-[420px] w-full shadow-[0_0_50px_rgba(234,88,12,0.15)] transform transition-all animate-fade-in-up text-center relative overflow-hidden">
-                        {/* Tia sáng Background */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-32 bg-orange-500/10 blur-[50px] pointer-events-none"></div>
-
-                        <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10">
-                            <Sparkles className="text-orange-500 absolute -top-2 -right-2 w-5 h-5 animate-pulse" />
-                            <Popcorn size={32} className="text-orange-500" />
-                        </div>
-
-                        <h3 className="text-2xl font-bold text-white mb-2 relative z-10">
-                            Gợi ý dành cho bạn!
-                        </h3>
-                        <p className="text-zinc-400 text-sm mb-6 relative z-10">
-                            Tối ưu chi phí cho {selectedSeats.length} người xem.
-                        </p>
-
-                        <div className="bg-black/50 rounded-xl p-4 mb-6 border border-zinc-800 relative z-10">
-                            <div className="h-32 mb-4 bg-zinc-900 rounded-lg flex items-center justify-center overflow-hidden p-2">
-                                {suggestedCombo.image_url ? (
-                                    <img
-                                        src={suggestedCombo.image_url}
-                                        alt="Combo"
-                                        className="w-full h-full object-contain drop-shadow-xl hover:scale-105 transition-transform duration-500"
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 md:p-8 max-w-md w-full shadow-[0_0_40px_rgba(0,0,0,0.5)] transform transition-all animate-fade-in-up">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-6 w-6 text-orange-500"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                                     />
-                                ) : (
-                                    <Popcorn size={40} className="text-zinc-700" />
-                                )}
+                                </svg>
                             </div>
-                            <h4 className="font-bold text-lg text-white mb-1">
-                                {suggestedCombo.combo_name}
-                            </h4>
-                            <p className="text-zinc-400 text-sm leading-relaxed min-h-[40px] flex items-center justify-center">
-                                {suggestedCombo.description}
-                            </p>
-                            <div className="text-orange-500 font-black text-2xl mt-4 drop-shadow-[0_0_10px_rgba(234,88,12,0.4)]">
-                                {Number(
-                                    suggestedCombo.current_price ?? suggestedCombo.price
-                                ).toLocaleString('vi-VN')}{' '}
-                                đ
+                            <h3 className="text-2xl font-bold text-white tracking-wide">
+                                Quy định rạp
+                            </h3>
+                        </div>
+
+                        <div className="space-y-5 text-zinc-300 text-[15px] mb-8 leading-relaxed">
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🔞</span>
+                                <p>
+                                    Phim dành cho khán giả từ{' '}
+                                    <strong className="text-red-400">
+                                        {movie?.age_limit || 'đúng độ tuổi quy định'}
+                                    </strong>
+                                    . Rạp có quyền từ chối việc xem phim nếu khách hàng không mang
+                                    giấy tờ tùy thân.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🍿</span>
+                                <p>
+                                    Tuyệt đối không mang đồ ăn, thức uống từ bên ngoài vào rạp chiếu
+                                    phim.
+                                </p>
+                            </div>
+                            <div className="flex gap-3 items-start">
+                                <span className="text-xl">🎟️</span>
+                                <p>
+                                    Vé đã mua thành công{' '}
+                                    <strong className="text-white">không thể hoàn hoặc hủy</strong>{' '}
+                                    dưới mọi hình thức.
+                                </p>
                             </div>
                         </div>
 
-                        <div className="flex gap-3 relative z-10">
+                        <div className="flex gap-3">
                             <button
-                                onClick={() => confirmContinue(null)}
+                                onClick={() => setShowRulesModal(false)}
                                 disabled={isHolding}
                                 className="flex-1 py-3 px-4 rounded-xl font-semibold bg-zinc-800 text-white hover:bg-zinc-700 transition disabled:opacity-50"
                             >
-                                Bỏ qua
+                                Hủy bỏ
                             </button>
                             <button
-                                onClick={() => confirmContinue(suggestedCombo)}
+                                onClick={confirmContinue}
                                 disabled={isHolding}
-                                className="flex-[1.5] py-3 px-4 rounded-xl font-bold bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 transition shadow-lg hover:shadow-orange-500/25 disabled:opacity-70 flex justify-center items-center"
+                                className="flex-1 py-3 px-4 rounded-xl font-semibold bg-orange-600 text-white hover:bg-orange-500 transition shadow-[0_0_15px_rgba(234,88,12,0.4)] disabled:opacity-70 flex items-center justify-center gap-2"
                             >
                                 {isHolding ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Đang khóa ghế...
+                                    </>
                                 ) : (
-                                    'Thêm vào giỏ'
+                                    'Tôi đồng ý'
                                 )}
                             </button>
                         </div>

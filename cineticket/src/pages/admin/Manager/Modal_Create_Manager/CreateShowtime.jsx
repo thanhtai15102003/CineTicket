@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
+import LoadingSpinner from '../../../../components/common/LoadingSpinner';
 import {
     Calendar,
     Clock,
@@ -10,7 +10,7 @@ import {
     CheckCircle2,
     Ticket
 } from 'lucide-react';
-import Toast from '../../components/common/Toast';
+import Toast from '../../../../components/common/Toast';
 import { useNavigate } from 'react-router-dom';
 
 export default function CreateShowtime() {

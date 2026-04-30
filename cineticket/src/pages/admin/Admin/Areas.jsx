@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
-import Toast from '../../components/common/Toast';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Pagination from '../../components/common/Pagination';
+import Toast from '../../../components/common/Toast';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
+import Pagination from '../../../components/common/Pagination';
 
 const Areas = () => {
     const [search, setSearch] = useState('');

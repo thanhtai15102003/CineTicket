@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Check, X } from 'lucide-react';
-import Toast from '../../components/common/Toast';
+import Toast from '../../../../components/common/Toast';
 
 export function CreateRoomModal({ onClose, onCreate, roomData }) {
     const navigate = useNavigate();

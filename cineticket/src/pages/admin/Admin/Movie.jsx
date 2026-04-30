@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, Pencil, Trash2, X, Check } from 'lucide-react';
-import Pagination from '../../components/common/Pagination';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Toast from '../../components/common/Toast';
+import Pagination from '../../../components/common/Pagination';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
+import Toast from '../../../components/common/Toast';
 
 // Danh sách các quốc gia phổ biến sản xuất phim
 const COUNTRIES = [

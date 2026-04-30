@@ -14,7 +14,8 @@ import {
     ChevronDown,
     Clapperboard,
     Building,
-    Clock
+    Clock,
+    Popcorn
 } from 'lucide-react';
 
 import { hasPermission } from '../utils/permission';
@@ -34,6 +35,8 @@ const AdminLayout = ({ children }) => {
         if (pathname.startsWith('/admin/rooms')) return 'Quản lý phòng chiếu';
         if (pathname.startsWith('/admin/seat-layout')) return 'Sơ đồ ghế ngồi';
         if (pathname.startsWith('/admin/showtimes')) return 'Quản lý suất chiếu';
+        if (pathname.startsWith('/admin/combo')) return 'Quản lý Combo';
+        if (pathname.startsWith('/manager/combo')) return 'Quản lý Combo';
         return 'Bảng điều khiển';
     };
 
@@ -76,6 +79,7 @@ const AdminLayout = ({ children }) => {
         if (pathname === '/dashboard') return null;
         if (pathname.startsWith('/admin/users')) return 'manage_users';
         if (pathname.startsWith('/admin/movies')) return 'manage_movies';
+        if (pathname.startsWith('/admin/combo')) return 'admin_combo';
         if (pathname.startsWith('/admin/areas') || pathname.startsWith('/admin/cinemas'))
             return 'manage_cinemas';
         return null;
@@ -176,6 +180,14 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
+                {hasPermission(currentUser, 'admin_combo') && (
+                    <NavItem
+                        to="/admin/combo"
+                        icon={<Popcorn size={22} />}
+                        label="Combo"
+                        pathname={location.pathname}
+                    />
+                )}
                 {hasPermission(currentUser, 'manage_rooms') && (
                     <NavItem
                         to="/admin/rooms"
@@ -197,6 +209,14 @@ const AdminLayout = ({ children }) => {
                         to="/admin/showtimes"
                         icon={<Clock size={22} />}
                         label="Suất chiếu"
+                        pathname={location.pathname}
+                    />
+                )}
+                {hasPermission(currentUser, 'manage_combo') && (
+                    <NavItem
+                        to="/manager/combo"
+                        icon={<Popcorn size={22} />}
+                        label="COmbo"
                         pathname={location.pathname}
                     />
                 )}

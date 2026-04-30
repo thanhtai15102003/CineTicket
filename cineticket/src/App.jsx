@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+    {/*------------Clinet--------------- */}
 import MainLayout from './layouts/MainLayout';
 import Home from './pages/client/Home';
 import Movies from './pages/client/Movies';
@@ -8,19 +9,25 @@ import Login from './pages/client/Login';
 import ComboPage from './pages/client/ComboPage';
 import Profile from './pages/client/Profile';
 
+    {/*------------Admin--------------- */}
 import AdminLayout from './layouts/AdminLayout';
-import Dashboard from './pages/admin/DashBoard';
-import Users from './pages/admin/User';
-import Areas from './pages/admin/Areas';
-import Cinemas from './pages/admin/Cinemas';
-import MoviesAdmin from './pages/admin/Movie';
-import SeatLayoutManagement from './pages/admin/SeatLayoutManagement';
-import SeatLayoutEditor from './pages/admin/SeatLayoutEditor';
-import ShowtimeManagement from './pages/admin/ShowtimeManagement';
-import CreateShowtime from './pages/admin/CreateShowtime';
+import Dashboard from './pages/admin/Admin/DashBoard';
+import Users from './pages/admin/Admin/User';
+import Areas from './pages/admin/Admin/Areas';
+import Cinemas from './pages/admin/Admin/Cinemas';
+import MoviesAdmin from './pages/admin/Admin/Movie';
+import Combo from './pages/admin/Admin/AdminCombo';
 
-import Rooms from './pages/admin/Rooms';
-import SeatLayout from './pages/admin/SeatLayout';
+
+    {/*----------------Manager---------------*/}
+import SeatLayoutManagement from './pages/admin/Manager/SeatLayoutManagement';
+import SeatLayoutEditor from './pages/admin/Manager/Modal_Create_Manager/SeatLayoutEditor';
+import ShowtimeManagement from './pages/admin/Manager/ShowtimeManagement';
+import CreateShowtime from './pages/admin/Manager/Modal_Create_Manager/CreateShowtime';
+import Rooms from './pages/admin/Manager/Rooms';
+import SeatLayout from './pages/admin/Manager/SeatLayout';
+import ManagerCombo from './pages/admin/Manager/ManagerCombo';
+
 
 function App() {
     return (
@@ -89,7 +96,7 @@ function App() {
                     }
                 />
 
-                {/* Trang admin dashboard */}
+                {/* --------------------- Trang admin dashboard -------------------------- */}
                 <Route
                     path="/dashboard"
                     element={
@@ -104,6 +111,15 @@ function App() {
                     element={
                         <AdminLayout>
                             <Users />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý combo */}
+                <Route
+                    path="/admin/combo"
+                    element={
+                        <AdminLayout>
+                            <Combo />
                         </AdminLayout>
                     }
                 />
@@ -135,7 +151,7 @@ function App() {
                         </AdminLayout>
                     }
                 />
-                {/* Trang quản lý phòng của admin chi nhánh */}
+                {/*--------------------------- Trang quản lý của Manager chi nhánh------------------------ */}
                 {/* Quản lý phòng */}
                 <Route
                     path="/admin/rooms"
@@ -195,6 +211,15 @@ function App() {
                     element={
                         <AdminLayout>
                             <CreateShowtime />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý Combo */}
+                <Route
+                    path="/manager/combo"
+                    element={
+                        <AdminLayout>
+                            <ManagerCombo />
                         </AdminLayout>
                     }
                 />

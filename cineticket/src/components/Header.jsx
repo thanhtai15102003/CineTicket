@@ -160,7 +160,7 @@ const Header = () => {
     // 🌟 NẾU ĐANG Ở TRANG ĐẶT VÉ -> RENDER HEADER TỐI GIẢN
     if (isBookingFlow) {
         return (
-            <header className="fixed top-0 w-full bg-zinc-950 border-b border-zinc-800 z-50 shadow-lg">
+            <header className="fixed top-0 w-full bg-zinc-950 z-50 shadow-lg">
                 <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
                     {/* LOGO */}
                     <div className="flex items-center gap-3">
@@ -205,10 +205,10 @@ const Header = () => {
     // =========================================================================
     return (
         <header
-            className={`fixed top-0 w-full z-50 transition-all duration-300 border-b ${
+            className={`fixed top-0 w-full z-50 transition-all duration-300 ${
                 scrolled
-                    ? 'bg-zinc-950/85 backdrop-blur-xl border-white/5 shadow-lg shadow-black/50 py-0'
-                    : 'bg-gradient-to-b from-zinc-950/95 to-transparent border-transparent py-2'
+                    ? 'bg-zinc-950/85 backdrop-blur-xl shadow-lg shadow-black/50 py-0'
+                    : 'bg-gradient-to-b from-zinc-950/95 to-transparent py-2'
             }`}
         >
             <div className="max-w-7xl mx-auto px-4 md:px-6">
@@ -521,7 +521,7 @@ const Header = () => {
 
             {/* MOBILE MENU */}
             <div
-                className={`lg:hidden overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-h-[85vh] opacity-100 border-b border-white/10' : 'max-h-0 opacity-0'}`}
+                className={`lg:hidden overflow-y-auto custom-scrollbar transition-all duration-500 ease-in-out ${isMenuOpen ? 'max-h-[85vh] opacity-100' : 'max-h-0 opacity-0'}`}
             >
                 <div className="bg-zinc-950/95 backdrop-blur-2xl px-4 py-6 flex flex-col gap-6 shadow-2xl">
                     <div className="flex flex-col gap-2 text-[15px] font-semibold border-b border-white/5 pb-4">

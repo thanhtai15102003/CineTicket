@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import CreateSeatLayoutModal from './CreateSeatLayoutModal';
-import Pagination from '../../components/common/Pagination';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
+import CreateSeatLayoutModal from './Modal_Create_Manager/CreateSeatLayoutModal';
+import Pagination from '../../../components/common/Pagination';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
 
 const tabs = [
     { key: 'all', label: 'Tất cả' },

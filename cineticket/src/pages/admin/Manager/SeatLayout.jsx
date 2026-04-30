@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Save, XCircle, Info, ChevronLeft, MoveHorizontal } from 'lucide-react';
 import { IconArmchair, IconArmchair2, IconSofa, IconEraser } from '@tabler/icons-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Toast from '../../components/common/Toast';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
+import Toast from '../../../components/common/Toast';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
 
 const SeatLayout = () => {
     const { id } = useParams();

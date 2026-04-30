@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { Plus, Pencil, Search } from 'lucide-react';
 import axios from 'axios';
 
-import Toast from '../../components/common/Toast';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Pagination from '../../components/common/Pagination';
+import Toast from '../../../components/common/Toast';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
+import Pagination from '../../../components/common/Pagination';
 
 const BASE_URL = 'https://cinema-api-production-f2bc.up.railway.app/api/v1';
 

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { CreateRoomModal } from './CreateRoomModal';
-import Toast from '../../components/common/Toast';
-import LoadingSpinner from '../../components/common/LoadingSpinner';
-import Pagination from '../../components/common/Pagination';
+import { CreateRoomModal } from './Modal_Create_Manager/CreateRoomModal';
+import Toast from '../../../components/common/Toast';
+import LoadingSpinner from '../../../components/common/LoadingSpinner';
+import Pagination from '../../../components/common/Pagination';
 
 export default function Rooms() {
     const navigate = useNavigate();
