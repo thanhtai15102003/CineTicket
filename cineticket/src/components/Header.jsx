@@ -8,6 +8,7 @@ const Header = () => {
 
     const handleSelectCinema = (cinema) => {
         changeCinema(cinema);
+        navigate(`/cinemas/${cinema.cinema_id}`);
     };
 
     const location = useLocation();
@@ -241,7 +242,13 @@ const Header = () => {
                         {[
                             { path: '/movies', label: 'Phim' },
                             { path: '#', label: 'Lịch chiếu' },
-                            { path: '#', label: 'Rạp' },
+                            {
+                                // THAY ĐỔI Ở ĐÂY: Lấy ID của rạp đang chọn từ Context
+                                path: selectedCinema
+                                    ? `/cinemas/${selectedCinema.cinema_id || selectedCinema.id}`
+                                    : '#',
+                                label: 'Rạp'
+                            },
                             { path: '#', label: 'Giá vé' }
                         ].map((item, index) => (
                             <Link
@@ -425,6 +432,45 @@ const Header = () => {
                                                 </p>
                                             </div>
                                         </div>
+
+                                        {/* ================= THÊM MỚI TẠI ĐÂY ================= */}
+                                        {['admin', 'manager'].includes(
+                                            String(
+                                                currentUser?.role?.role_name ||
+                                                    currentUser?.role ||
+                                                    ''
+                                            ).toLowerCase()
+                                        ) && (
+                                            <Link
+                                                to={
+                                                    String(
+                                                        currentUser?.role?.role_name ||
+                                                            currentUser?.role ||
+                                                            ''
+                                                    ).toLowerCase() === 'manager'
+                                                        ? '/manager/dashboard'
+                                                        : '/admin/dashboard'
+                                                }
+                                                className="px-3 py-2.5 text-sm font-bold text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 rounded-xl transition-colors flex items-center gap-3 mb-1"
+                                            >
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-4 h-4"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                                                    />
+                                                </svg>
+                                                Trang quản trị
+                                            </Link>
+                                        )}
+
                                         <Link
                                             to="/profile"
                                             state={{ targetTab: 'Thông Tin Cá Nhân' }}

@@ -16,11 +16,12 @@ const Cinemas = () => {
         cinema_name: '',
         branch: '',
         address: '',
-        phone: ''
+        phone: '',
+        map_url: '' // <-- THÊM MỚI
     });
 
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 5; // số dòng mỗi trang
+    const itemsPerPage = 5;
 
     const [cinemas, setCinemas] = useState([]);
     const [regions, setRegions] = useState([]);
@@ -63,6 +64,7 @@ const Cinemas = () => {
                 region_id: item.region?.region_id || '',
                 address: item.address,
                 phone: item.phone || '',
+                map_url: item.map_url || '', // <-- THÊM MỚI
                 status: item.status
             }));
 
@@ -141,29 +143,24 @@ const Cinemas = () => {
 
             const token = localStorage.getItem('token');
 
+            // Payload chung cho cả PUT và POST
+            const payload = {
+                cinema_name: form.cinema_name,
+                address: form.address,
+                phone: form.phone,
+                region_id: form.branch,
+                map_url: form.map_url // <-- THÊM MỚI
+            };
+
             if (isEdit) {
-                await axios.put(
-                    `${BASE_URL}/admin/cinemas/${editingId}`,
-                    {
-                        cinema_name: form.cinema_name,
-                        address: form.address,
-                        phone: form.phone,
-                        region_id: form.branch
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+                await axios.put(`${BASE_URL}/admin/cinemas/${editingId}`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 showToast('Cập nhật thành công 🎉');
             } else {
-                await axios.post(
-                    `${BASE_URL}/admin/cinemas`,
-                    {
-                        cinema_name: form.cinema_name,
-                        address: form.address,
-                        phone: form.phone,
-                        region_id: form.branch
-                    },
-                    { headers: { Authorization: `Bearer ${token}` } }
-                );
+                await axios.post(`${BASE_URL}/admin/cinemas`, payload, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 showToast('Tạo thành công 🎉');
             }
 
@@ -171,11 +168,11 @@ const Cinemas = () => {
             setOpenModal(false);
             resetForm();
         } catch {
-            showToast('Rạp đã tồn tại trong khu vực này ❌');
+            showToast('Lỗi xử lý hệ thống ❌');
         } finally {
             setSubmitting(false);
         }
-    };;
+    };
 
     // ================== EDIT ==================
     const handleEdit = (item) => {
@@ -183,7 +180,8 @@ const Cinemas = () => {
             cinema_name: item.cinema_name,
             branch: item.region_id,
             address: item.address,
-            phone: item.phone
+            phone: item.phone,
+            map_url: item.map_url // <-- THÊM MỚI
         });
 
         setEditingId(item.id);
@@ -196,7 +194,8 @@ const Cinemas = () => {
             cinema_name: '',
             branch: '',
             address: '',
-            phone: ''
+            phone: '',
+            map_url: '' // <-- THÊM MỚI
         });
         setIsEdit(false);
         setEditingId(null);
@@ -307,7 +306,7 @@ const Cinemas = () => {
 
             {/* MODAL */}
             {openModal && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded-xl space-y-4 w-[400px]">
                         <h3 className="font-semibold">{isEdit ? 'Chỉnh sửa rạp' : 'Tạo rạp'}</h3>
 
@@ -315,13 +314,13 @@ const Cinemas = () => {
                             value={form.cinema_name}
                             onChange={(e) => setForm({ ...form, cinema_name: e.target.value })}
                             placeholder="Tên rạp"
-                            className="w-full border p-2 rounded"
+                            className="w-full border p-2 rounded focus:outline-none focus:border-red-500"
                         />
 
                         <select
                             value={form.branch}
                             onChange={(e) => setForm({ ...form, branch: e.target.value })}
-                            className="w-full border p-2 rounded"
+                            className="w-full border p-2 rounded focus:outline-none focus:border-red-500"
                         >
                             <option value="">Chọn khu vực</option>
                             {regions.map((r) => (
@@ -335,23 +334,36 @@ const Cinemas = () => {
                             value={form.address}
                             onChange={(e) => setForm({ ...form, address: e.target.value })}
                             placeholder="Địa chỉ"
-                            className="w-full border p-2 rounded"
+                            className="w-full border p-2 rounded focus:outline-none focus:border-red-500"
                         />
 
                         <input
                             value={form.phone}
                             onChange={(e) => setForm({ ...form, phone: e.target.value })}
                             placeholder="SĐT"
-                            className="w-full border p-2 rounded"
+                            className="w-full border p-2 rounded focus:outline-none focus:border-red-500"
                         />
 
-                        <div className="flex justify-end gap-2">
-                            <button onClick={() => setOpenModal(false)}>Huỷ</button>
+                        {/* THÊM MỚI: Input nhập Map URL */}
+                        <input
+                            value={form.map_url}
+                            onChange={(e) => setForm({ ...form, map_url: e.target.value })}
+                            placeholder="Link Google Maps / iframe nhúng"
+                            className="w-full border p-2 rounded focus:outline-none focus:border-red-500"
+                        />
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button
+                                onClick={() => setOpenModal(false)}
+                                className="px-4 py-2 text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition"
+                            >
+                                Huỷ
+                            </button>
 
                             <button
                                 onClick={handleSubmit}
                                 disabled={submitting}
-                                className="bg-red-600 text-white px-4 py-2 rounded"
+                                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition disabled:opacity-70"
                             >
                                 {submitting ? 'Đang xử lý...' : isEdit ? 'Cập nhật' : 'Thêm'}
                             </button>
@@ -362,10 +374,12 @@ const Cinemas = () => {
 
             {/* TOAST */}
             {toast.show && (
-                <Toast
-                    message={toast.message}
-                    onClose={() => setToast({ show: false, message: '' })}
-                />
+                <div className="fixed top-20 right-8 z-[200]">
+                    <Toast
+                        message={toast.message}
+                        onClose={() => setToast({ show: false, message: '' })}
+                    />
+                </div>
             )}
         </div>
     );

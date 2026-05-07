@@ -1,27 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, X, Check, Upload, Image as ImageIcon } from 'lucide-react';
 import Pagination from '../../../components/common/Pagination';
 import LoadingSpinner from '../../../components/common/LoadingSpinner';
 import Toast from '../../../components/common/Toast';
 
 // Danh sách các quốc gia phổ biến sản xuất phim
 const COUNTRIES = [
-    'Việt Nam',
-    'Mỹ',
-    'Hàn Quốc',
-    'Nhật Bản',
-    'Thái Lan',
-    'Trung Quốc',
-    'Đài Loan',
-    'Hồng Kông',
-    'Anh',
-    'Pháp',
-    'Ấn Độ',
-    'Đức',
-    'Tây Ban Nha',
-    'Úc',
-    'Canada',
-    'Khác'
+    'Việt Nam', 'Mỹ', 'Hàn Quốc', 'Nhật Bản', 'Thái Lan', 'Trung Quốc',
+    'Đài Loan', 'Hồng Kông', 'Anh', 'Pháp', 'Ấn Độ', 'Đức', 'Tây Ban Nha',
+    'Úc', 'Canada', 'Khác'
 ];
 
 const Films = () => {
@@ -51,11 +38,10 @@ const Films = () => {
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
-    // Đã đổi country thành mảng countries[] để hỗ trợ chọn nhiều
     const [form, setForm] = useState({
         title: '',
         director: '',
-        countries: [], // <-- ĐỔI THÀNH MẢNG
+        countries: [], 
         actors: '',
         duration: '',
         genre_ids: [],
@@ -64,7 +50,9 @@ const Films = () => {
         end_date: '',
         description: '',
         poster_url: '',
+        poster_file: null,     // Thêm quản lý file poster
         backdrop_url: '',
+        backdrop_file: null,   // Thêm quản lý file backdrop
         trailer_url: ''
     });
 
@@ -79,7 +67,6 @@ const Films = () => {
         }));
     };
 
-    // Hàm xử lý chọn nhiều Quốc gia
     const toggleCountry = (country) => {
         setForm((prev) => ({
             ...prev,
@@ -136,12 +123,11 @@ const Films = () => {
                     end_date: m.end_date || '',
                     age_limit: m.age_limit || '',
                     country: m.country || 'N/A',
-                    // Tách chuỗi quốc gia thành mảng để lát nữa đổ vào Form Sửa
-                    raw_countries:
-                        m.country && m.country !== 'N/A'
+                    raw_countries: m.country && m.country !== 'N/A'
                             ? m.country.split(',').map((c) => c.trim())
                             : [],
-                    poster_url: m.poster_url || 'https://via.placeholder.com/100x150?text=No+Image',
+                    poster_url: m.poster_url || '',
+                    backdrop_url: m.backdrop_url || '',
                     trailer_url: m.trailer_url || '#',
                     director: m.director || 'N/A',
                     actors: Array.isArray(m.actors)
@@ -189,7 +175,7 @@ const Films = () => {
         fetchGenres();
     }, []);
 
-    // ================== GENRE: ADD ==================
+    // ================== GENRE LOGIC ==================
     const handleAddGenre = async () => {
         if (!newGenreName.trim()) return;
         try {
@@ -220,7 +206,6 @@ const Films = () => {
         }
     };
 
-    // ================== GENRE: UPDATE ==================
     const handleUpdateGenre = async () => {
         if (!editingGenre?.genre_name.trim()) return;
         try {
@@ -251,7 +236,6 @@ const Films = () => {
         }
     };
 
-    // ================== GENRE: DELETE ==================
     const handleDeleteGenre = (id) => {
         setConfirm({
             show: true,
@@ -303,45 +287,63 @@ const Films = () => {
         try {
             setSubmitting(true);
 
-            // BÓC TÁCH CHỈ LẤY SỐ CHO age_limit
-            const parsedAgeLimit = form.age_limit
-                ? Number(String(form.age_limit).replace(/\D/g, ''))
-                : 0;
+            const parsedAgeLimit = form.age_limit ? Number(String(form.age_limit).replace(/\D/g, '')) : 0;
 
-            // Gộp mảng countries thành chuỗi nối nhau bằng dấu phẩy
-            const payload = {
-                title: form.title,
-                director: form.director,
-                country: form.countries.join(', '), // Mảng ['Mỹ', 'Anh'] -> Chuỗi "Mỹ, Anh"
-                duration: Number(form.duration),
-                description: form.description,
-                release_date: form.release_date,
-                end_date: form.end_date,
-                age_limit: parsedAgeLimit,
-                poster_url: form.poster_url,
-                trailer_url: form.trailer_url,
-                actors: form.actors,
-                genre_ids: form.genre_ids,
-                backdrop_url: form.backdrop_url
-            };
+            // 💡 CHUYỂN SANG DÙNG FORMDATA ĐỂ GỬI ĐƯỢC FILE ẢNH
+            const formDataToSend = new FormData();
+            formDataToSend.append('title', form.title);
+            formDataToSend.append('director', form.director || '');
+            formDataToSend.append('country', form.countries.join(', '));
+            formDataToSend.append('duration', Number(form.duration) || 0);
+            formDataToSend.append('description', form.description || '');
+            formDataToSend.append('release_date', form.release_date || '');
+            formDataToSend.append('end_date', form.end_date || '');
+            formDataToSend.append('age_limit', parsedAgeLimit);
+            formDataToSend.append('trailer_url', form.trailer_url || '');
+            formDataToSend.append('actors', form.actors || '');
+            
+            // Xử lý mảng genre_ids cho form data
+            form.genre_ids.forEach((id) => {
+                formDataToSend.append('genre_ids[]', id);
+            });
 
-            const url = isEdit
-                ? `https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies/${editingId}`
-                : `https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies`;
+            // Gửi File hoặc Link ảnh Poster
+            if (form.poster_file) {
+                formDataToSend.append('poster_file', form.poster_file);
+            } else {
+                const finalPosterUrl = (form.poster_url && form.poster_url.startsWith('blob:')) ? '' : form.poster_url;
+                formDataToSend.append('poster_url', finalPosterUrl);
+            }
+
+            // Gửi File hoặc Link ảnh Backdrop
+            if (form.backdrop_file) {
+                formDataToSend.append('backdrop_file', form.backdrop_file);
+            } else {
+                const finalBackdropUrl = (form.backdrop_url && form.backdrop_url.startsWith('blob:')) ? '' : form.backdrop_url;
+                formDataToSend.append('backdrop_url', finalBackdropUrl);
+            }
+
+            let method = 'POST';
+            let url = 'https://cinema-api-production-f2bc.up.railway.app/api/v1/admin/movies';
+
+            if (isEdit) {
+                url = `${url}/${editingId}`;
+                formDataToSend.append('_method', 'PUT'); // Đánh lừa Laravel
+            }
 
             const res = await fetch(url, {
-                method: isEdit ? 'PUT' : 'POST',
+                method: method,
                 headers: {
                     Authorization: `Bearer ${getToken()}`,
-                    'Content-Type': 'application/json',
                     Accept: 'application/json'
+                    // LƯU Ý: Tuyệt đối KHÔNG set Content-Type: application/json ở đây
                 },
-                body: JSON.stringify(payload)
+                body: formDataToSend
             });
 
             const json = await res.json();
             if (!res.ok) {
-                showToast(json.message || 'Thất bại ❌');
+                showToast(json.message || Object.values(json.errors || {}).flat().join(', ') || 'Thất bại ❌');
                 return;
             }
 
@@ -371,11 +373,10 @@ const Films = () => {
             })
             .filter(Boolean);
 
-        // Lấy mảng raw_countries đã xử lý lúc fetch
         setForm({
             title: item.title,
             director: item.director,
-            countries: item.raw_countries || [], // Đổ lại mảng vào form
+            countries: item.raw_countries || [],
             actors: item.actors?.join(', '),
             duration: item.duration,
             genre_ids: matchedGenreIds,
@@ -384,7 +385,9 @@ const Films = () => {
             end_date: item.end_date,
             description: item.description,
             poster_url: item.poster_url,
+            poster_file: null,
             backdrop_url: item.backdrop_url || '',
+            backdrop_file: null,
             trailer_url: item.trailer_url
         });
         setEditingId(item.movie_id);
@@ -400,11 +403,10 @@ const Films = () => {
         setShowGenreManager(false);
         setEditingGenre(null);
         setNewGenreName('');
-        // Xóa sạch form
         setForm({
             title: '',
             director: '',
-            countries: [], // Reset mảng
+            countries: [], 
             actors: '',
             duration: '',
             genre_ids: [],
@@ -413,7 +415,9 @@ const Films = () => {
             end_date: '',
             description: '',
             poster_url: '',
+            poster_file: null,
             backdrop_url: '',
+            backdrop_file: null,
             trailer_url: ''
         });
     };
@@ -460,7 +464,7 @@ const Films = () => {
                 />
                 <input
                     value={search}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearch(e.target.value)}
                     placeholder="Tìm phim..."
                     className="w-full pl-9 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
@@ -493,9 +497,17 @@ const Films = () => {
                                 <tr key={item.movie_id} className="border-t hover:bg-gray-50">
                                     <td className="px-4 py-3">
                                         <img
-                                            src={item.poster_url}
+                                            src={
+                                                item.poster_url ||
+                                                'https://placehold.co/100x150?text=No+Image'
+                                            }
                                             className="w-12 h-16 object-cover rounded shadow-sm"
                                             alt={item.title}
+                                            onError={(e) => {
+                                                e.target.onerror = null; // Chặn lặp vô hạn nếu ảnh dự phòng cũng lỗi
+                                                e.target.src =
+                                                    'https://placehold.co/100x150?text=No+Image';
+                                            }}
                                         />
                                     </td>
                                     <td className="px-4 py-3 font-medium text-gray-800 line-clamp-2">
@@ -652,7 +664,7 @@ const Films = () => {
                                     />
                                 </div>
 
-                                {/* ===== QUỐC GIA SẢN XUẤT (Dạng Tags chọn nhiều) ===== */}
+                                {/* ===== QUỐC GIA SẢN XUẤT ===== */}
                                 <div className="col-span-2 p-4 bg-gray-50 rounded-xl border">
                                     <div className="flex items-center justify-between mb-3">
                                         <label className="block text-sm font-medium text-gray-700">
@@ -709,8 +721,6 @@ const Films = () => {
                                             {showGenreManager ? 'Ẩn quản lý' : 'Quản lý thể loại'}
                                         </button>
                                     </div>
-
-                                    {/* Genre tags chọn */}
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {genres.map((g) => (
                                             <button
@@ -759,8 +769,7 @@ const Films = () => {
                                                     Thêm
                                                 </button>
                                             </div>
-
-                                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white p-2 rounded-lg border">
+                                            <div className="max-h-32 overflow-y-auto space-y-1 bg-white p-2 rounded-lg border custom-scrollbar">
                                                 {genres.map((g) => (
                                                     <div
                                                         key={g.genre_id}
@@ -837,7 +846,6 @@ const Films = () => {
                                         </div>
                                     )}
                                 </div>
-                                {/* ===== END GENRE BLOCK ===== */}
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -866,30 +874,144 @@ const Films = () => {
                                     />
                                 </div>
 
+                                {/* ===== POSTER UPLOAD ===== */}
                                 <div className="col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Link Poster
+                                        Poster phim (Ảnh dọc)
                                     </label>
-                                    <input
-                                        value={form.poster_url}
-                                        onChange={(e) =>
-                                            setForm({ ...form, poster_url: e.target.value })
-                                        }
-                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
-                                    />
+                                    <div className="flex gap-4 items-start">
+                                        <div className="relative w-24 h-32 border-2 border-dashed border-gray-300 hover:border-red-400 rounded-xl bg-gray-50 flex flex-col items-center justify-center shrink-0 overflow-hidden group transition cursor-pointer">
+                                            {form.poster_url ? (
+                                                <>
+                                                    <img
+                                                        src={form.poster_url}
+                                                        alt="Poster Preview"
+                                                        className="w-full h-full object-cover p-1"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                        <span className="text-white text-xs font-semibold">
+                                                            Đổi ảnh
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-center p-2 flex flex-col items-center gap-1">
+                                                    <Upload
+                                                        size={20}
+                                                        className="text-gray-400 group-hover:text-red-500 transition-colors"
+                                                    />
+                                                    <span className="text-[10px] text-gray-500 font-medium group-hover:text-red-500">
+                                                        Tải ảnh lên
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const previewUrl =
+                                                            URL.createObjectURL(file);
+                                                        setForm({
+                                                            ...form,
+                                                            poster_url: previewUrl,
+                                                            poster_file: file
+                                                        });
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-2 mt-2">
+                                            <input
+                                                type="url"
+                                                value={form.poster_url || ''}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        poster_url: e.target.value,
+                                                        poster_file: null // Hủy file nếu dán link
+                                                    })
+                                                }
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition"
+                                                placeholder="Hoặc dán link web ảnh (https://...) vào đây"
+                                            />
+                                            <p className="text-xs text-gray-500">
+                                                * Dán đường dẫn bắt đầu bằng <b>http://</b> hoặc{' '}
+                                                <b>https://</b>
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* ===== BACKDROP UPLOAD ===== */}
                                 <div className="col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Link Backdrop
+                                        Backdrop phim (Ảnh ngang 16:9)
                                     </label>
-                                    <input
-                                        value={form.backdrop_url}
-                                        onChange={(e) =>
-                                            setForm({ ...form, backdrop_url: e.target.value })
-                                        }
-                                        className="w-full border p-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500"
-                                    />
+                                    <div className="flex gap-4 items-start">
+                                        <div className="relative w-36 h-20 border-2 border-dashed border-gray-300 hover:border-red-400 rounded-xl bg-gray-50 flex flex-col items-center justify-center shrink-0 overflow-hidden group transition cursor-pointer">
+                                            {form.backdrop_url ? (
+                                                <>
+                                                    <img
+                                                        src={form.backdrop_url}
+                                                        alt="Backdrop Preview"
+                                                        className="w-full h-full object-cover p-1"
+                                                    />
+                                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                        <span className="text-white text-xs font-semibold">
+                                                            Đổi ảnh
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div className="text-center p-2 flex flex-col items-center gap-1">
+                                                    <Upload
+                                                        size={20}
+                                                        className="text-gray-400 group-hover:text-red-500 transition-colors"
+                                                    />
+                                                    <span className="text-[10px] text-gray-500 font-medium group-hover:text-red-500">
+                                                        Tải ảnh lên
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (file) {
+                                                        const previewUrl =
+                                                            URL.createObjectURL(file);
+                                                        setForm({
+                                                            ...form,
+                                                            backdrop_url: previewUrl,
+                                                            backdrop_file: file
+                                                        });
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-2 mt-2">
+                                            <input
+                                                type="url"
+                                                value={form.backdrop_url || ''}
+                                                onChange={(e) =>
+                                                    setForm({
+                                                        ...form,
+                                                        backdrop_url: e.target.value,
+                                                        backdrop_file: null // Hủy file nếu dán link
+                                                    })
+                                                }
+                                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition"
+                                                placeholder="Hoặc dán link web ảnh (https://...) vào đây"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
+
                                 <div className="col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Link YouTube Trailer

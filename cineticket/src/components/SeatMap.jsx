@@ -159,12 +159,14 @@ const SeatMap = ({
             const halfPrice = getPrice('double') / 2;
 
             onSeatSelect({
+                seat_id: seat.id,
                 id: seatLabelToSend,
                 label: seatLabelToSend,
                 price: halfPrice,
                 type: 'double'
             });
             onSeatSelect({
+                seat_id: pairSeat.id,
                 id: pairSeat.displayLabel,
                 label: pairSeat.displayLabel,
                 price: halfPrice,
@@ -172,6 +174,7 @@ const SeatMap = ({
             });
         } else {
             onSeatSelect({
+                seat_id: seat.id,
                 id: seatLabelToSend,
                 label: seatLabelToSend,
                 price: getPrice(seat.type),
@@ -352,6 +355,6 @@ const SeatMap = ({
             </div>
         </div>
     );
-};;;
+};
 
 export default SeatMap;

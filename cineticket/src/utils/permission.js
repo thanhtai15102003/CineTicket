@@ -1,6 +1,21 @@
 export const permissions = {
-    admin: ['manage_users', 'manage_cinemas', 'manage_movies', 'admin_combo'],
-    manager: ['manage_rooms', 'manage_seat_layouts', 'manage_showtimes', 'manage_combo'],
+    admin: [
+        'admin_dashboard',
+        'manage_users',
+        'manage_cinemas',
+        'manage_movies',
+        'admin_combo',
+        'admin_banners'
+    ],
+    manager: [
+        'manage_rooms',
+        'manage_seat_layouts',
+        'manage_showtimes',
+        'manage_combo',
+        'manage_cinema-info',
+        'manager_tickets',
+        'manager_dashboard'
+    ],
     staff: []
 };
 

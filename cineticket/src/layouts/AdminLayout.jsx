@@ -15,7 +15,10 @@ import {
     Clapperboard,
     Building,
     Clock,
-    Popcorn
+    Popcorn,
+    MapPin,
+    Image,
+    TicketCheck
 } from 'lucide-react';
 
 import { hasPermission } from '../utils/permission';
@@ -26,10 +29,12 @@ const AdminLayout = ({ children }) => {
     const [currentUser, setCurrentUser] = useState(null);
 
     const getPageTitle = (pathname) => {
-        if (pathname === '/admin') return 'Dashboard tổng quan';
+        if (pathname === '/admin/dashboard') return 'Dashboard Admin';
+        if (pathname === '/manager/dashboard') return 'Dashboard Manager';
         if (pathname.startsWith('/admin/cinemas')) return 'Quản lý rạp chiếu';
         if (pathname.startsWith('/admin/areas')) return 'Quản lý chi nhánh';
         if (pathname.startsWith('/admin/tickets')) return 'Quản lý phim';
+        if (pathname.startsWith('/admin/banners')) return 'Quản lý Banner';
         if (pathname.startsWith('/admin/revenue')) return 'Báo cáo doanh thu';
         if (pathname.startsWith('/admin/users')) return 'Quản lý người dùng';
         if (pathname.startsWith('/admin/rooms')) return 'Quản lý phòng chiếu';
@@ -37,6 +42,8 @@ const AdminLayout = ({ children }) => {
         if (pathname.startsWith('/admin/showtimes')) return 'Quản lý suất chiếu';
         if (pathname.startsWith('/admin/combo')) return 'Quản lý Combo';
         if (pathname.startsWith('/manager/combo')) return 'Quản lý Combo';
+        if (pathname.startsWith('/manager/cinema-info')) return 'Quản lý thông tin rạp';
+        if (pathname.startsWith('/manager/tickets')) return 'Quản lý vé';
         return 'Bảng điều khiển';
     };
 
@@ -76,10 +83,11 @@ const AdminLayout = ({ children }) => {
     }, [navigate]);
 
     const getRequiredPermission = (pathname) => {
-        if (pathname === '/dashboard') return null;
+        if (pathname === '/admin/dashboard' || pathname === '/manager/dashboard') return null;
         if (pathname.startsWith('/admin/users')) return 'manage_users';
         if (pathname.startsWith('/admin/movies')) return 'manage_movies';
         if (pathname.startsWith('/admin/combo')) return 'admin_combo';
+        if (pathname.startsWith('/admin/banners')) return 'admin_banners';
         if (pathname.startsWith('/admin/areas') || pathname.startsWith('/admin/cinemas'))
             return 'manage_cinemas';
         return null;
@@ -89,7 +97,9 @@ const AdminLayout = ({ children }) => {
         if (currentUser) {
             const requiredPerm = getRequiredPermission(location.pathname);
             if (requiredPerm && !hasPermission(currentUser, requiredPerm)) {
-                navigate('/dashboard');
+                // Xác định role để đưa về đúng trang
+                const isManager = currentUser.role?.role_name?.toLowerCase() === 'manager';
+                navigate(isManager ? '/manager/dashboard' : '/admin/dashboard');
             }
         }
     }, [currentUser, location.pathname, navigate]);
@@ -124,14 +134,24 @@ const AdminLayout = ({ children }) => {
                 {/* Dòng phân cách */}
                 <div className="w-10 h-[1px] bg-gray-100 mb-2 rounded-full"></div>
 
-                {/* Dashboard */}
-                <NavItem
-                    to="/dashboard"
-                    icon={<Home size={22} />}
-                    label="Tổng quan"
-                    pathname={location.pathname}
-                    exact
-                />
+                {/* Dashboard admin */}
+                {hasPermission(currentUser, 'admin_dashboard') && (
+                    <NavItem
+                        to="/admin/dashboard"
+                        icon={<Home size={22} />}
+                        label="Tổng quan"
+                        pathname={location.pathname}
+                    />
+                )}
+                {/* Dashboard manager */}
+                {hasPermission(currentUser, 'manager_dashboard') && (
+                    <NavItem
+                        to="/manager/dashboard"
+                        icon={<Home size={22} />}
+                        label="Tổng quan"
+                        pathname={location.pathname}
+                    />
+                )}
 
                 {/* GROUP RẠP */}
                 {hasPermission(currentUser, 'manage_cinemas') && (
@@ -188,6 +208,14 @@ const AdminLayout = ({ children }) => {
                         pathname={location.pathname}
                     />
                 )}
+                {hasPermission(currentUser, 'admin_banners') && (
+                    <NavItem
+                        to="/admin/banners"
+                        icon={<Image size={22} />}
+                        label="Bannes"
+                        pathname={location.pathname}
+                    />
+                )}
                 {hasPermission(currentUser, 'manage_rooms') && (
                     <NavItem
                         to="/admin/rooms"
@@ -216,7 +244,23 @@ const AdminLayout = ({ children }) => {
                     <NavItem
                         to="/manager/combo"
                         icon={<Popcorn size={22} />}
-                        label="COmbo"
+                        label="Combo"
+                        pathname={location.pathname}
+                    />
+                )}
+                {hasPermission(currentUser, 'manage_cinema-info') && (
+                    <NavItem
+                        to="/manager/cinema-info"
+                        icon={<MapPin size={22} />}
+                        label="Cinema-Info"
+                        pathname={location.pathname}
+                    />
+                )}
+                {hasPermission(currentUser, 'manager_tickets') && (
+                    <NavItem
+                        to="/manager/tickets"
+                        icon={<TicketCheck size={22} />}
+                        label="Quản lý vé"
                         pathname={location.pathname}
                     />
                 )}
@@ -261,14 +305,46 @@ const AdminLayout = ({ children }) => {
 
                         <div className="h-6 w-[1px] bg-gray-200"></div>
 
-                        {/* Nút Đăng xuất */}
-                        <button
-                            onClick={handleLogout}
-                            title="Đăng xuất"
-                            className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-300 hover:rotate-12"
-                        >
-                            <LogOut size={20} strokeWidth={2.5} />
-                        </button>
+                        {/* Nút Menu Dropdown (Trang chủ & Đăng xuất) */}
+                        <div className="relative group cursor-pointer z-50">
+                            {/* Nút Trigger (Vẫn giữ icon LogOut nhưng bỏ sự kiện onClick trực tiếp) */}
+                            <div className="p-2.5 text-gray-400 group-hover:text-red-600 group-hover:bg-red-50 rounded-full transition-all duration-300">
+                                <LogOut
+                                    size={20}
+                                    strokeWidth={2.5}
+                                    className="group-hover:-translate-x-0.5 transition-transform"
+                                />
+                            </div>
+
+                            {/* Bảng Dropdown hiển thị khi Hover */}
+                            <div className="absolute top-[110%] right-0 w-44 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out transform origin-top-right group-hover:translate-y-0 translate-y-2">
+                                <div className="bg-white border border-gray-200 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] flex flex-col p-1.5 relative">
+                                    {/* Mũi tên chỉ lên (Tạo điểm nhấn UI) */}
+                                    <div className="absolute -top-2 right-4 w-4 h-4 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
+
+                                    {/* Content (Z-index cao hơn mũi tên để đè lên) */}
+                                    <div className="relative z-10 bg-white rounded-lg flex flex-col">
+                                        <Link
+                                            to="/"
+                                            className="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+                                        >
+                                            <Home size={16} />
+                                            Trang chủ
+                                        </Link>
+
+                                        <div className="h-[1px] bg-gray-100 my-1 mx-2"></div>
+
+                                        <button
+                                            onClick={handleLogout}
+                                            className="flex items-center gap-3 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors w-full text-left"
+                                        >
+                                            <LogOut size={16} />
+                                            Đăng xuất
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </header>
 

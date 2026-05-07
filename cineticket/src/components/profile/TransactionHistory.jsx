@@ -1,63 +1,122 @@
 // src/components/profile/TransactionHistory.jsx
-import React, { useState } from 'react';
-
-
-// DỮ LIỆU GIẢ LẬP LỊCH SỬ GIAO DỊCH
-const MOCK_HISTORY = [
-    {
-        id: 'CT8829102',
-        movie_title: 'Phí Phông: Quỷ Máu Rừng Thiêng',
-        poster_url:
-            'https://files.betacorp.vn/media%2fimages%2f2026%2f03%2f26%2fanh%2Dchup%2Dman%2Dhinh%2D2026%2D03%2D26%2D114032%2D114119%2D260326%2D54.png',
-        cinema_name: 'CINETICKET PREMIUM QUẬN 1',
-        show_date: '20/04/2026',
-        show_time: '19:30',
-        room: 'Rạp 3',
-        seats: 'H7, H8',
-        total_price: 180000,
-        status: 'upcoming'
-    },
-    {
-        id: 'CT8823155',
-        movie_title: 'Dune: Hành Tinh Cát - Phần 2',
-        poster_url:
-            'https://files.betacorp.vn/media%2fimages%2f2024%2f02%2f27%2f400x600-111153-270224-21.jpg',
-        cinema_name: 'CINETICKET GÒ VẤP',
-        show_date: '10/03/2026',
-        show_time: '14:15',
-        room: 'Rạp IMAX',
-        seats: 'K10',
-        total_price: 150000,
-        status: 'completed'
-    },
-    {
-        id: 'CT8810023',
-        movie_title: 'Mai',
-        poster_url:
-            'https://files.betacorp.vn/media%2fimages%2f2024%2f01%2f30%2fmai-163236-300124-74.jpg',
-        cinema_name: 'CINETICKET THỦ ĐỨC',
-        show_date: '15/02/2026',
-        show_time: '20:00',
-        room: 'Rạp 1',
-        seats: 'E5, E6, E7',
-        total_price: 360000,
-        status: 'cancelled'
-    }
-];
+import React, { useState, useEffect } from 'react';
+import Toast from '../common/Toast';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const TransactionHistory = () => {
     // State quản lý việc bật/tắt Popup mã QR vé
     const [selectedTicket, setSelectedTicket] = useState(null);
 
+    // State lưu trữ dữ liệu API
+    const [transactions, setTransactions] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    // State xử lý Hủy vé và Thông báo
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+    // Lấy dữ liệu từ API
+    useEffect(() => {
+        const fetchHistory = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                setError('Vui lòng đăng nhập để xem lịch sử giao dịch.');
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    'https://cinema-api-production-f2bc.up.railway.app/api/v1/users/me/bookings',
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Lỗi khi tải dữ liệu. Vui lòng thử lại sau.');
+                }
+
+                const result = await response.json();
+
+                // Tùy theo API trả về mảng trực tiếp hay bọc trong result.data
+                const data = result.data ? result.data : result;
+
+                // Đảo ngược mảng để vé mới nhất lên đầu
+                setTransactions(data.reverse());
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchHistory();
+    }, []);
+
+    // =========================================================
+    // HÀM XỬ LÝ HỦY VÉ
+    // =========================================================
+    const handleCancelTicket = async (bookingId) => {
+        // Xác nhận tránh bấm nhầm
+        if (
+            !window.confirm(
+                'Bạn có chắc chắn muốn hủy vé này không? Hành động này không thể hoàn tác.'
+            )
+        ) {
+            return;
+        }
+
+        setIsCancelling(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(
+                `https://cinema-api-production-f2bc.up.railway.app/api/v1/bookings/${bookingId}/cancel`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`
+                    }
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || 'Không thể hủy vé lúc này.');
+            }
+
+            // Cập nhật lại UI: Đổi trạng thái vé thành cancelled
+            setTransactions((prev) =>
+                prev.map((t) => (t.booking_id === bookingId ? { ...t, status: 'cancelled' } : t))
+            );
+
+            // Cập nhật luôn vé đang xem trong Popup
+            setSelectedTicket((prev) => ({ ...prev, status: 'cancelled' }));
+
+            setToast({ show: true, message: 'Đã hủy vé thành công!', type: 'success' });
+        } catch (err) {
+            setToast({ show: true, message: err.message, type: 'error' });
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
     // Hàm phụ trợ để lấy màu và nhãn cho trạng thái VÉ
     const getStatusInfo = (status) => {
         switch (status) {
-            case 'upcoming': // Hoặc trạng thái từ BE trả về là 'unused'
+            case 'upcoming':
                 return {
                     label: 'Chưa sử dụng',
                     color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                 };
-            case 'completed': // Hoặc 'used'
+            case 'completed':
                 return {
                     label: 'Đã sử dụng',
                     color: 'text-zinc-400 bg-zinc-800 border-zinc-700'
@@ -75,8 +134,38 @@ const TransactionHistory = () => {
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-12 shadow-2xl flex flex-col items-center justify-center min-h-[400px]">
+                <div className="w-10 h-10 border-4 border-red-500/30 border-t-red-600 rounded-full animate-spin mb-4"></div>
+                <p className="text-zinc-400 animate-pulse">Đang tải lịch sử giao dịch...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-8 shadow-2xl">
+                <div className="text-center py-16 bg-red-500/10 rounded-2xl border border-red-500/20">
+                    <p className="text-red-400 font-medium">{error}</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <>
+        <div className="relative">
+            {/* THÔNG BÁO TOAST NẾU CÓ */}
+            {toast.show && (
+                <div className="absolute -top-4 right-0 z-[100]">
+                    <Toast
+                        message={toast.message}
+                        type={toast.type}
+                        onClose={() => setToast({ show: false, message: '', type: 'success' })}
+                    />
+                </div>
+            )}
+
             <div className="bg-zinc-900/60 backdrop-blur-xl border border-white/5 rounded-3xl p-6 md:p-8 shadow-2xl animate-fade-in-up">
                 {/* Header Phần Lịch Sử */}
                 <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
@@ -87,23 +176,23 @@ const TransactionHistory = () => {
                         </h3>
                     </div>
                     <span className="px-4 py-1.5 bg-black/40 border border-white/5 rounded-full text-xs font-medium text-zinc-400">
-                        {MOCK_HISTORY.length} giao dịch
+                        {transactions.length} giao dịch
                     </span>
                 </div>
 
                 {/* Danh Sách Vé */}
                 <div className="flex flex-col gap-5">
-                    {MOCK_HISTORY.length === 0 ? (
+                    {transactions.length === 0 ? (
                         <div className="text-center py-16 bg-black/20 rounded-2xl border border-white/5">
                             <p className="text-zinc-500 font-medium">Bạn chưa có giao dịch nào.</p>
                         </div>
                     ) : (
-                        MOCK_HISTORY.map((item, index) => {
+                        transactions.map((item, index) => {
                             const statusInfo = getStatusInfo(item.status);
 
                             return (
                                 <div
-                                    key={index}
+                                    key={item.id || index}
                                     className="flex flex-col sm:flex-row bg-black/40 border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 hover:shadow-2xl hover:shadow-red-500/5 transition-all group"
                                 >
                                     {/* 1. Poster Phim */}
@@ -214,7 +303,7 @@ const TransactionHistory = () => {
                                         </div>
                                     </div>
 
-                                    {/* Đường xé vé (Chỉ hiện trên giao diện desktop) */}
+                                    {/* Đường xé vé */}
                                     <div className="hidden sm:flex flex-col justify-center items-center relative">
                                         <div className="w-[1px] h-full border-l-2 border-dashed border-white/10"></div>
                                         <div className="absolute top-[-10px] w-5 h-5 rounded-full bg-zinc-950"></div>
@@ -241,7 +330,7 @@ const TransactionHistory = () => {
                                                     item.status === 'upcoming'
                                                         ? 'bg-red-600 text-white hover:bg-red-700 shadow-[0_0_15px_rgba(220,38,38,0.4)]'
                                                         : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
-                                                }`}
+                                                } px-4 py-2 rounded-xl text-sm font-bold w-full sm:w-auto`}
                                             >
                                                 {item.status === 'upcoming'
                                                     ? 'Hiện mã QR'
@@ -263,7 +352,7 @@ const TransactionHistory = () => {
                     onClick={() => setSelectedTicket(null)}
                 >
                     <div
-                        className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.2)] animate-scale-in relative"
+                        className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(220,38,38,0.2)] animate-scale-in relative flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Nút đóng */}
@@ -285,76 +374,100 @@ const TransactionHistory = () => {
                             </svg>
                         </button>
 
-                        {/* Nửa trên: QR Code */}
-                        <div className="pt-10 pb-6 px-8 flex flex-col items-center bg-gray-50 border-b-2 border-dashed border-gray-300 relative">
-                            {/* 2 lỗ khoét giả xé vé */}
-                            <div className="absolute -bottom-3 -left-3 w-6 h-6 bg-black/90 rounded-full"></div>
-                            <div className="absolute -bottom-3 -right-3 w-6 h-6 bg-black/90 rounded-full"></div>
+                        <div className="overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                            {/* Nửa trên: QR Code */}
+                            <div className="pt-10 pb-6 px-8 flex flex-col items-center bg-gray-50 border-b-2 border-dashed border-gray-300 relative">
+                                {/* 2 lỗ khoét giả xé vé */}
+                                <div className="absolute -bottom-3 -left-3 w-6 h-6 bg-black/90 rounded-full"></div>
+                                <div className="absolute -bottom-3 -right-3 w-6 h-6 bg-black/90 rounded-full"></div>
 
-                            <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">
-                                Quét mã tại quầy / lối vào
-                            </p>
+                                <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">
+                                    Quét mã tại quầy / lối vào
+                                </p>
 
-                            {/* DEMO QR CODE (Dùng API tạo QR miễn phí) */}
-                            <div className="p-3 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
-                                <img
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedTicket.id}&color=000000`}
-                                    alt="QR Code"
-                                    className={`w-40 h-40 ${selectedTicket.status !== 'upcoming' ? 'opacity-30' : ''}`}
-                                />
+                                {/* DEMO QR CODE */}
+                                <div className="p-3 bg-white border border-gray-200 rounded-2xl shadow-sm mb-4">
+                                    <img
+                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedTicket.id}&color=000000`}
+                                        alt="QR Code"
+                                        className={`w-40 h-40 ${selectedTicket.status !== 'upcoming' ? 'opacity-30' : ''}`}
+                                    />
+                                </div>
+
+                                {selectedTicket.status !== 'upcoming' && (
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <span className="bg-black/80 text-white px-4 py-2 font-bold uppercase tracking-widest rounded-lg rotate-12">
+                                            {selectedTicket.status === 'cancelled'
+                                                ? 'VÉ ĐÃ HỦY'
+                                                : 'VÉ ĐÃ SỬ DỤNG'}
+                                        </span>
+                                    </div>
+                                )}
+
+                                <p className="font-mono text-xl tracking-[0.2em] text-gray-800 font-bold">
+                                    {selectedTicket.id}
+                                </p>
                             </div>
 
-                            {selectedTicket.status !== 'upcoming' && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="bg-black/80 text-white px-4 py-2 font-bold uppercase tracking-widest rounded-lg rotate-12">
-                                        VÉ KHÔNG KHẢ DỤNG
-                                    </span>
-                                </div>
-                            )}
+                            {/* Nửa dưới: Thông tin vé */}
+                            <div className="p-8 pt-6">
+                                <h3 className="text-xl font-black text-gray-900 text-center mb-6 line-clamp-2">
+                                    {selectedTicket.movie_title}
+                                </h3>
 
-                            <p className="font-mono text-xl tracking-[0.2em] text-gray-800 font-bold">
-                                {selectedTicket.id}
-                            </p>
-                        </div>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                                        <span className="text-gray-500 text-sm">Rạp</span>
+                                        <span className="font-bold text-gray-900 text-right max-w-[60%]">
+                                            {selectedTicket.cinema_name}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                                        <span className="text-gray-500 text-sm">Thời gian</span>
+                                        <span className="font-bold text-gray-900">
+                                            {selectedTicket.show_time} - {selectedTicket.show_date}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                                        <span className="text-gray-500 text-sm">Phòng chiếu</span>
+                                        <span className="font-bold text-gray-900">
+                                            {selectedTicket.room}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-1">
+                                        <span className="text-gray-500 text-sm">Ghế ngồi</span>
+                                        <span className="text-xl font-black text-red-600">
+                                            {selectedTicket.seats}
+                                        </span>
+                                    </div>
+                                </div>
 
-                        {/* Nửa dưới: Thông tin vé */}
-                        <div className="p-8 pt-6">
-                            <h3 className="text-xl font-black text-gray-900 text-center mb-6 line-clamp-2">
-                                {selectedTicket.movie_title}
-                            </h3>
-
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                                    <span className="text-gray-500 text-sm">Rạp</span>
-                                    <span className="font-bold text-gray-900 text-right max-w-[60%]">
-                                        {selectedTicket.cinema_name}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                                    <span className="text-gray-500 text-sm">Thời gian</span>
-                                    <span className="font-bold text-gray-900">
-                                        {selectedTicket.show_time} - {selectedTicket.show_date}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                                    <span className="text-gray-500 text-sm">Phòng chiếu</span>
-                                    <span className="font-bold text-gray-900">
-                                        {selectedTicket.room}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between items-center pt-1">
-                                    <span className="text-gray-500 text-sm">Ghế ngồi</span>
-                                    <span className="text-xl font-black text-red-600">
-                                        {selectedTicket.seats}
-                                    </span>
-                                </div>
+                                {/* NÚT HỦY VÉ (Chỉ hiện nếu vé còn hạn sử dụng) */}
+                                {selectedTicket.status === 'upcoming' && (
+                                    <button
+                                        onClick={() =>
+                                            handleCancelTicket(selectedTicket.booking_id)
+                                        }
+                                        disabled={isCancelling}
+                                        className="w-full mt-8 py-3.5 bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        {isCancelling ? (
+                                            <>
+                                                <div className="w-4 h-4 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin"></div>
+                                                Đang xử lý...
+                                            </>
+                                        ) : (
+                                            'Hủy vé này'
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-        </>
+        </div>
     );
-};;
+};
 
 export default TransactionHistory;

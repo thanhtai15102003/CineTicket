@@ -82,9 +82,12 @@ const Login = () => {
                 if (fromPath) {
                     // Ưu tiên 1: Nếu bị đá văng từ trang Booking -> Trả về đúng trang Booking đó
                     targetPath = fromPath;
-                } else if (userRole === 'admin' || userRole === 'manager') {
-                    // Ưu tiên 2: Nếu login bình thường và là Admin -> Vào trang quản trị
-                    targetPath = '/dashboard';
+                } else if (userRole === 'admin') {
+                    // Ưu tiên 2: Admin về Dashboard của Admin
+                    targetPath = '/admin/dashboard';
+                } else if (userRole === 'manager') {
+                    // Ưu tiên 3: Manager về Dashboard của Manager
+                    targetPath = '/manager/dashboard';
                 }
 
                 // Đợi 1.5s để user nhìn thấy thông báo rồi mới chuyển trang

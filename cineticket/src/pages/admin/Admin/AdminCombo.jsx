@@ -71,6 +71,7 @@ export default function AdminCombo() {
         price: '',
         description: '',
         image_url: '',
+        image_file: null, // Thêm trường image_file để quản lý file từ máy
         start_date: '',
         end_date: '',
         target_audience: 1,
@@ -114,6 +115,7 @@ export default function AdminCombo() {
             price: '',
             description: '',
             image_url: '',
+            image_file: null,
             start_date: '',
             end_date: '',
             target_audience: 1,
@@ -130,17 +132,19 @@ export default function AdminCombo() {
             end_date: formatDate(combo.end_date),
             price: Number(combo.price) || 0,
             target_audience: Number(combo.target_audience) || 1,
-            status: combo.status || 'active'
+            status: combo.status || 'active',
+            image_file: null // Đặt lại null khi mở form sửa
         });
         setOpenModal(true);
     };
 
     // ==========================================
-    // 2. THÊM / CẬP NHẬT COMBO
+    // 2. THÊM / CẬP NHẬT COMBO (Bằng FormData)
     // ==========================================
     const handleSaveCombo = async (e) => {
         e.preventDefault();
 
+        // Kiểm tra logic ngày tháng cơ bản
         if (formData.start_date && formData.end_date) {
             if (new Date(formData.start_date) > new Date(formData.end_date)) {
                 showToast('Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu! ❌', 'error');
@@ -148,50 +152,59 @@ export default function AdminCombo() {
             }
         }
 
-        const isEditing = !!comboToEdit;
-        const method = isEditing ? 'PUT' : 'POST';
-        const url = isEditing ? `${API_URL}/${comboToEdit.combo_id}` : API_URL;
+        setLoading(true); // Hiệu ứng loading lúc submit
 
         try {
-            // 💡 XỬ LÝ DỮ LIỆU ĐỂ PASS QUA VALIDATION CỦA BACKEND
-            let finalImageUrl = formData.image_url;
+            const formDataToSend = new FormData();
 
-            // Nếu là link do chọn ảnh từ máy tính (blob:) thì bắt buộc gán null
-            if (finalImageUrl && finalImageUrl.startsWith('blob:')) {
-                finalImageUrl = null;
+            // Đưa các trường thông tin vào FormData
+            formDataToSend.append('combo_name', formData.combo_name);
+            formDataToSend.append('price', formData.price);
+            formDataToSend.append('description', formData.description || '');
+            formDataToSend.append('target_audience', formData.target_audience);
+            formDataToSend.append('start_date', formData.start_date || '');
+            formDataToSend.append('end_date', formData.end_date || '');
+            formDataToSend.append('status', formData.status || 'active');
+
+            // Xử lý gửi File hoặc Link
+            if (formData.image_file) {
+                formDataToSend.append('image_file', formData.image_file);
+            } else {
+                // Đảm bảo không gửi chuỗi "blob:" sinh ra từ URL.createObjectURL lên server
+                const finalUrl =
+                    formData.image_url && formData.image_url.startsWith('blob:')
+                        ? ''
+                        : formData.image_url;
+                formDataToSend.append('image_url', finalUrl || '');
             }
 
-            const payload = {
-                combo_name: formData.combo_name,
-                price: Number(formData.price),
-                description: formData.description || null,
-                image_url: finalImageUrl,
-                target_audience: Number(formData.target_audience),
-                status: formData.status || 'active',
-                start_date: formData.start_date || null,
-                end_date: formData.end_date || null
-            };
+            // MẸO: Laravel không nhận File qua phương thức PUT/PATCH trực tiếp
+            // Nên nếu là Sửa (Edit), ta vẫn dùng POST nhưng thêm trường _method = 'PUT'
+            let method = 'POST';
+            let url = API_URL; // Link gốc để thêm mới
+
+            if (comboToEdit) {
+                url = `${API_URL}/${comboToEdit.combo_id}`;
+                formDataToSend.append('_method', 'PUT'); // Đánh lừa Laravel đây là lệnh PUT
+            }
 
             const response = await fetch(url, {
                 method: method,
-                headers: getAuthHeaders(),
-                body: JSON.stringify(payload)
+                headers: {
+                    // QUAN TRỌNG: KHÔNG để Content-Type ở đây, trình duyệt sẽ tự động thiết lập Content-Type: multipart/form-data
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    Accept: 'application/json'
+                },
+                body: formDataToSend
             });
 
             const result = await response.json();
 
             if (response.ok) {
-                const savedCombo = result.data || result;
-
-                if (isEditing) {
-                    setCombos((prev) =>
-                        prev.map((c) => (c.combo_id === savedCombo.combo_id ? savedCombo : c))
-                    );
-                    showToast('Cập nhật combo thành công ✅');
-                } else {
-                    setCombos((prev) => [savedCombo, ...prev]);
-                    showToast('Thêm combo mới thành công ✅');
-                }
+                showToast(
+                    comboToEdit ? 'Cập nhật combo thành công! ✅' : 'Thêm combo mới thành công! ✅'
+                );
+                fetchCombos(); // Tải lại danh sách từ server để lấy ảnh thật
                 setOpenModal(false);
             } else {
                 // Hiển thị chi tiết lỗi từ Backend
@@ -201,11 +214,13 @@ export default function AdminCombo() {
                         .flat()
                         .join(', ');
                 showToast(errorMessage || 'Dữ liệu không hợp lệ! ❌', 'error');
-                console.error('Lỗi Validation:', result);
+                console.error('Lỗi Validation Backend:', result);
             }
         } catch (error) {
-            console.error('Fetch Error:', error);
+            console.error('Error:', error);
             showToast('Lỗi mạng hoặc máy chủ không phản hồi!', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -604,11 +619,6 @@ export default function AdminCombo() {
                                                         image_url: previewUrl,
                                                         image_file: file
                                                     });
-                                                    // Nếu chọn file thì báo nhẹ cho user biết là đang dùng API URL
-                                                    showToast(
-                                                        'Tạm thời hệ thống chỉ lưu Link URL. Link gốc sẽ bị xóa khi lưu',
-                                                        'success'
-                                                    );
                                                 }
                                             }}
                                         />
@@ -621,15 +631,15 @@ export default function AdminCombo() {
                                                 setFormData({
                                                     ...formData,
                                                     image_url: e.target.value,
-                                                    image_file: null
+                                                    image_file: null // Hủy file máy tính nếu user dán link web
                                                 })
                                             }
                                             className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition"
                                             placeholder="Hoặc dán link web ảnh (https://...) vào đây"
                                         />
                                         <p className="text-xs text-gray-500 mt-2">
-                                            * Để lưu thành công, hãy đảm bảo dán link ảnh hợp lệ bắt
-                                            đầu bằng <b>http://</b> hoặc <b>https://</b>
+                                            * Bạn có thể chọn ảnh từ máy tính hoặc dán đường dẫn ảnh
+                                            (bắt đầu bằng <b>http://</b> hoặc <b>https://</b>).
                                         </p>
                                     </div>
                                 </div>

@@ -9,6 +9,7 @@ import Login from './pages/client/Login';
 import ComboPage from './pages/client/ComboPage';
 import Profile from './pages/client/Profile';
 import PaymentPage from './pages/client/PaymentPage';
+import CinemaDetailsPage from './pages/client/CinemaDetailsPage';
 
     {/*------------Admin--------------- */}
 import AdminLayout from './layouts/AdminLayout';
@@ -18,9 +19,11 @@ import Areas from './pages/admin/Admin/Areas';
 import Cinemas from './pages/admin/Admin/Cinemas';
 import MoviesAdmin from './pages/admin/Admin/Movie';
 import Combo from './pages/admin/Admin/AdminCombo';
+import AdminBanner from './pages/admin/Admin/AdminBanner';
 
 
-    {/*----------------Manager---------------*/}
+{/*----------------Manager---------------*/ }
+import ManagerDashboard from './pages/admin/Manager/ManagerDashboard';
 import SeatLayoutManagement from './pages/admin/Manager/SeatLayoutManagement';
 import SeatLayoutEditor from './pages/admin/Manager/Modal_Create_Manager/SeatLayoutEditor';
 import ShowtimeManagement from './pages/admin/Manager/ShowtimeManagement';
@@ -28,6 +31,8 @@ import CreateShowtime from './pages/admin/Manager/Modal_Create_Manager/CreateSho
 import Rooms from './pages/admin/Manager/Rooms';
 import SeatLayout from './pages/admin/Manager/SeatLayout';
 import ManagerCombo from './pages/admin/Manager/ManagerCombo';
+import ManagerCinemaPage from './pages/admin/Manager/ManagerCinemaPage';
+import TicketManagement from './pages/admin/Manager/TicketManagement';
 
 
 function App() {
@@ -106,10 +111,19 @@ function App() {
                         </MainLayout>
                     }
                 />
+                {/* Trang xem chi tiết Rạp */}
+                <Route
+                    path="/cinemas/:id"
+                    element={
+                        <MainLayout>
+                            <CinemaDetailsPage />
+                        </MainLayout>
+                    }
+                />
 
                 {/* --------------------- Trang admin dashboard -------------------------- */}
                 <Route
-                    path="/dashboard"
+                    path="/admin/dashboard"
                     element={
                         <AdminLayout>
                             <Dashboard />
@@ -162,7 +176,24 @@ function App() {
                         </AdminLayout>
                     }
                 />
+                {/* Trang quản banners */}
+                <Route
+                    path="/admin/banners"
+                    element={
+                        <AdminLayout>
+                            <AdminBanner />
+                        </AdminLayout>
+                    }
+                />
                 {/*--------------------------- Trang quản lý của Manager chi nhánh------------------------ */}
+                <Route
+                    path="/manager/dashboard"
+                    element={
+                        <AdminLayout>
+                            <ManagerDashboard />
+                        </AdminLayout>
+                    }
+                />
                 {/* Quản lý phòng */}
                 <Route
                     path="/admin/rooms"
@@ -231,6 +262,24 @@ function App() {
                     element={
                         <AdminLayout>
                             <ManagerCombo />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý thông tin Rạp */}
+                <Route
+                    path="/manager/cinema-info"
+                    element={
+                        <AdminLayout>
+                            <ManagerCinemaPage />
+                        </AdminLayout>
+                    }
+                />
+                {/* Trang quản lý vé */}
+                <Route
+                    path="/manager/tickets"
+                    element={
+                        <AdminLayout>
+                            <TicketManagement />
                         </AdminLayout>
                     }
                 />
